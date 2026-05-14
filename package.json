@@ -2,15 +2,14 @@
   "name": "ledn-challenge",
   "private": true,
   "workspaces": [
-    "backend",
-    "frontend",
+    "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "dev:backend": "npm run dev --workspace=backend",
-    "dev:frontend": "npm run dev --workspace=frontend",
-    "test:backend": "npm run test --workspace=backend",
-    "test:frontend": "npm run test --workspace=frontend",
+    "dev:backend": "npm run dev --workspace=apps/backend",
+    "dev:frontend": "npm run dev --workspace=apps/frontend",
+    "test:backend": "npm run test --workspace=apps/backend",
+    "test:frontend": "npm run test --workspace=apps/frontend",
     "lint": "npm run lint --workspaces --if-present"
   }
 }
