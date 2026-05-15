@@ -8,17 +8,18 @@ const WS_URL = import.meta.env.VITE_WS_URL ?? 'http://localhost:3000'
 
 export function useWebSocket() {
   const socketRef = useRef<Socket | null>(null)
-  const {
-    setConnected,
-    updatePrice,
-    setLiquidity,
-    addAlert,
-    setCircuitState,
-    setFeedMode,
-    setPrices,
-  } = useStore()
 
   useEffect(() => {
+    const {
+      setConnected,
+      updatePrice,
+      setLiquidity,
+      addAlert,
+      setCircuitState,
+      setFeedMode,
+      setPrices,
+    } = useStore.getState()
+
     const socket = io(WS_URL, { transports: ['websocket'] })
     socketRef.current = socket
 
