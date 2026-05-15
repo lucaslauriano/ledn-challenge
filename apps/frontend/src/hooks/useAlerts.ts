@@ -1,3 +1,4 @@
+import { useShallow } from 'zustand/react/shallow'
 import { useStore } from '../store'
 
 export function useAlerts() {
@@ -5,5 +6,7 @@ export function useAlerts() {
 }
 
 export function useActiveAlerts() {
-  return useStore((s) => s.alerts.filter((a) => !a.resolved))
+  return useStore(
+    useShallow((s) => s.alerts.filter((a) => !a.resolved))
+  )
 }
