@@ -15,10 +15,10 @@ export class PriceRecord {
   @Prop({ required: true })
   timestamp: Date;
 
-  @Prop({ enum: DataConfidence, default: DataConfidence.FRESH })
+  @Prop({ type: String, enum: DataConfidence, default: DataConfidence.FRESH })
   confidence: DataConfidence;
 
-  @Prop({ enum: CircuitState, default: CircuitState.CLOSED })
+  @Prop({ type: String, enum: CircuitState, default: CircuitState.CLOSED })
   circuitState: CircuitState;
 
   @Prop({ default: 'LIVE' })
