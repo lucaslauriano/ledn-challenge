@@ -1,5 +1,7 @@
-import { ChakraProvider, defaultSystem } from '@chakra-ui/react'
 import {
+  createSystem,
+  defaultConfig,
+  ChakraProvider,
   Box,
   Grid,
   GridItem,
@@ -16,13 +18,16 @@ import { LiquidityPanel } from './components/LiquidityPanel'
 import { AlertFeed } from './components/AlertFeed'
 import { SimulatorControl } from './components/SimulatorControl'
 import { ThemeToggle } from './components/ThemeToggle'
+import { ColorModeProvider } from './components/ui/color-mode'
+
+const system = createSystem(defaultConfig)
 
 function Dashboard() {
   useWebSocket()
   const connected = useStore((s) => s.connected)
 
   return (
-    <Box minH="100vh" bg="gray.50" p={6}>
+    <Box minH="100vh" bg="bg" p={6}>
       <HStack justify="space-between" mb={6}>
         <Heading size="lg">Ledn Operations Dashboard</Heading>
         <HStack>
@@ -30,7 +35,7 @@ function Dashboard() {
           <Badge colorPalette={connected ? 'green' : 'red'}>
             {connected ? 'Live' : 'Disconnected'}
           </Badge>
-          <Text fontSize="sm" color="gray.500">
+          <Text fontSize="sm" color="fg.muted">
             {new Date().toLocaleTimeString()}
           </Text>
         </HStack>
@@ -40,19 +45,15 @@ function Dashboard() {
         <GridItem>
           <FeedHealthPanel />
         </GridItem>
-
         <GridItem>
           <CircuitBreakerPanel />
         </GridItem>
-
         <GridItem>
           <LiquidityPanel />
         </GridItem>
-
         <GridItem>
           <AlertFeed />
         </GridItem>
-
         <GridItem colSpan={{ base: 1, lg: 2 }}>
           <SimulatorControl />
         </GridItem>
@@ -63,8 +64,10 @@ function Dashboard() {
 
 export default function App() {
   return (
-    <ChakraProvider value={defaultSystem}>
-      <Dashboard />
+    <ChakraProvider value={system}>
+      <ColorModeProvider>
+        <Dashboard />
+      </ColorModeProvider>
     </ChakraProvider>
   )
 }
