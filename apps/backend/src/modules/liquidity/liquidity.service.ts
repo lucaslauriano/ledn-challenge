@@ -1,11 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common'
-import { LiquiditySnapshot } from '@ledn/shared'
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
+import { WsEvent } from '@ledn/shared'
+import { NatsService } from '../../common/nats/nats.service'
 
 @Injectable()
-export class LiquidityService {
+export class LiquidityService implements OnModuleInit {
   private readonly logger = new Logger(LiquidityService.name)
 
-  private snapshot: LiquiditySnapshot = {
+  private snapshot = {
     available: 1_250_000,
     locked: 320_000,
     inFlight: 85_000,
@@ -13,7 +14,16 @@ export class LiquidityService {
     updatedAt: new Date().toISOString(),
   }
 
-  getSnapshot(): LiquiditySnapshot {
+  constructor(private readonly nats: NatsService) {}
+
+  onModuleInit() {
+    setInterval(() => {
+      const snapshot = this.getSnapshot()
+      this.nats.publish(WsEvent.LIQUIDITY_UPDATED, snapshot)
+    }, 2000)
+  }
+
+  getSnapshot() {
     const available: number = this.fluctuate(this.snapshot.available, 0.02)
     const inFlight: number = this.fluctuate(this.snapshot.inFlight, 0.05)
 
@@ -48,6 +58,7 @@ export class LiquidityService {
       `Released ${amount} — available: ${this.snapshot.available}`,
     )
   }
+
   private fluctuate(value: number, factor: number): number {
     const delta = value * factor * (Math.random() - 0.5)
     return parseFloat((value + delta).toFixed(2))

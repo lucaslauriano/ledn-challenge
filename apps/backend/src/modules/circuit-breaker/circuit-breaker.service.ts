@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { CircuitState } from '@ledn/shared'
+import { CircuitState, WsEvent, AlertType, AlertSeverity } from '@ledn/shared'
 import { RedisService } from '../../common/redis/redis.service'
+import { NatsService } from '../../common/nats/nats.service'
 
 const KEYS = {
   state: (assetId: string) => `circuit:${assetId}:state`,
@@ -10,7 +11,7 @@ const KEYS = {
 }
 
 @Injectable()
-export class CircuitBreakerService {
+export class CircuitBreakerService implements OnModuleInit {
   private readonly logger = new Logger(CircuitBreakerService.name)
   private readonly failureThreshold: number
   private readonly successThreshold: number
@@ -19,10 +20,19 @@ export class CircuitBreakerService {
   constructor(
     private readonly redis: RedisService,
     private readonly config: ConfigService,
+    private readonly nats: NatsService,
   ) {
     this.failureThreshold = this.config.get<number>('CB_FAILURE_THRESHOLD', 3)
     this.successThreshold = this.config.get<number>('CB_SUCCESS_THRESHOLD', 2)
-    this.timeoutMs = this.config.get<number>('CB_TIMEOUT_MS', 10000)
+    this.timeoutMs = this.config.get<number>('CB_TIMEOUT_MS', 5000)
+  }
+
+  onModuleInit() {
+    this.nats.subscribe<{ assetId: string }>('circuit.reset', ({ assetId }) => {
+      void this.reset(assetId).then(() => {
+        this.logger.log(`Circuit manually reset for ${assetId}`)
+      })
+    })
   }
 
   async getState(assetId: string): Promise<CircuitState> {
@@ -58,16 +68,36 @@ export class CircuitBreakerService {
   }
 
   async recordFailure(assetId: string): Promise<CircuitState> {
+    const currentState = await this.getState(assetId)
     const failures = await this.redis.incr(KEYS.failures(assetId))
     await this.redis.set(KEYS.lastFailure(assetId), Date.now().toString())
 
-    if (failures >= this.failureThreshold) {
+    if (
+      failures >= this.failureThreshold &&
+      currentState !== CircuitState.OPEN
+    ) {
       await this.setState(assetId, CircuitState.OPEN)
       this.logger.warn(`Circuit OPEN for ${assetId} after ${failures} failures`)
+
+      this.nats.publish(WsEvent.CIRCUIT_STATE_CHANGED, {
+        assetId,
+        state: CircuitState.OPEN,
+        timestamp: new Date().toISOString(),
+      })
+
+      this.nats.publish('alert.trigger', {
+        type: AlertType.CIRCUIT_OPEN,
+        severity: AlertSeverity.HIGH,
+        assetId,
+        message: `Circuit breaker OPEN for ${assetId} — serving cached data`,
+      })
+
       return CircuitState.OPEN
     }
 
-    return CircuitState.CLOSED
+    return currentState === CircuitState.OPEN
+      ? CircuitState.OPEN
+      : CircuitState.CLOSED
   }
 
   async isOpen(assetId: string): Promise<boolean> {
@@ -80,6 +110,12 @@ export class CircuitBreakerService {
     await this.redis.del(KEYS.failures(assetId))
     await this.redis.del(KEYS.lastFailure(assetId))
     await this.redis.del(`circuit:${assetId}:successes`)
+
+    this.nats.publish(WsEvent.CIRCUIT_STATE_CHANGED, {
+      assetId,
+      state: CircuitState.CLOSED,
+      timestamp: new Date().toISOString(),
+    })
   }
 
   private async setState(assetId: string, state: CircuitState): Promise<void> {

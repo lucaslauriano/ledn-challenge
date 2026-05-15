@@ -18,6 +18,9 @@ export class AlertRecord {
   @Prop({ required: true })
   message: string
 
+  @Prop({ default: () => new Date() })
+  timestamp: Date
+
   @Prop({ default: false })
   resolved: boolean
 

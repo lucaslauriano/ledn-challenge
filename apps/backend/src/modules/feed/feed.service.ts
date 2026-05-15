@@ -1,6 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common'
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { FeedMode } from '@ledn/shared'
+import { NatsService } from '../../common/nats/nats.service'
 
 export interface PriceTick {
   assetId: string
@@ -15,7 +21,7 @@ const BASE_PRICES: Record<string, number> = {
 }
 
 @Injectable()
-export class FeedService {
+export class FeedService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(FeedService.name)
   private modes: Record<string, FeedMode> = {
     BTC: FeedMode.HEALTHY,
@@ -25,7 +31,10 @@ export class FeedService {
   private intervals: Map<string, NodeJS.Timeout> = new Map()
   private handlers: Array<(tick: PriceTick) => void> = []
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly config: ConfigService,
+    private readonly nats: NatsService,
+  ) {
     this.intervalMs = this.config.get<number>('FEED_INTERVAL_MS', 1000)
   }
 
@@ -44,6 +53,10 @@ export class FeedService {
   setMode(assetId: string, mode: FeedMode) {
     this.modes[assetId] = mode
     this.logger.log(`Feed mode for ${assetId} set to ${mode}`)
+
+    if (mode === FeedMode.HEALTHY) {
+      this.nats.publish('circuit.reset', { assetId })
+    }
   }
 
   getMode(assetId: string): FeedMode {

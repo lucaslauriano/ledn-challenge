@@ -34,6 +34,35 @@ export class PriceService implements OnModuleInit {
     this.feed.onTick((tick) => {
       void this.handleTick(tick)
     })
+
+    setInterval(() => {
+      void this.checkStaleness()
+    }, 2000)
+  }
+
+  private async checkStaleness() {
+    const assets = ['BTC', 'ETH']
+    for (const assetId of assets) {
+      const cached = await this.redis.get(CACHE_KEY(assetId))
+      if (!cached) continue
+
+      const parsed = JSON.parse(cached) as PriceRecord
+      const ageMs = Date.now() - new Date(parsed.timestamp).getTime()
+
+      if (ageMs > this.staleThresholdMs) {
+        const staleRecord = {
+          ...parsed,
+          confidence: DataConfidence.STALE,
+          ageMs,
+        }
+        this.nats.publish(WsEvent.PRICE_UPDATED, staleRecord)
+
+        const isOpen = await this.circuitBreaker.isOpen(assetId)
+        if (!isOpen) {
+          await this.circuitBreaker.recordFailure(assetId)
+        }
+      }
+    }
   }
 
   async getCurrentPrice(assetId: string): Promise<PriceRecord | null> {
@@ -44,6 +73,7 @@ export class PriceService implements OnModuleInit {
     }
 
     const cached = await this.redis.get(CACHE_KEY(assetId))
+
     if (cached) {
       const parsed: PriceRecord = JSON.parse(cached)
       const ageMs = Date.now() - new Date(parsed.timestamp).getTime()

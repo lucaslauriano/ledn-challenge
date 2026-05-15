@@ -1,13 +1,25 @@
-import { Box, Text, VStack, HStack, Heading, Separator, Badge } from '@chakra-ui/react'
+import {
+  Box,
+  Text,
+  VStack,
+  HStack,
+  Heading,
+  Separator,
+  Badge,
+} from '@chakra-ui/react'
 import { AlertSeverity } from '@ledn/shared'
 import { useActiveAlerts } from '../../hooks/useAlerts'
 
 const severityColor = (severity: AlertSeverity) => {
   switch (severity) {
-    case AlertSeverity.LOW: return 'gray'
-    case AlertSeverity.MEDIUM: return 'yellow'
-    case AlertSeverity.HIGH: return 'orange'
-    case AlertSeverity.CRITICAL: return 'red'
+    case AlertSeverity.LOW:
+      return 'gray'
+    case AlertSeverity.MEDIUM:
+      return 'yellow'
+    case AlertSeverity.HIGH:
+      return 'orange'
+    case AlertSeverity.CRITICAL:
+      return 'red'
   }
 }
 
@@ -24,7 +36,9 @@ export function AlertFeed() {
       </HStack>
       <Separator mb={3} />
       {alerts.length === 0 ? (
-        <Text fontSize="sm" color="gray.400">No active alerts</Text>
+        <Text fontSize="sm" color="gray.400">
+          No active alerts
+        </Text>
       ) : (
         <VStack align="stretch" gap={2}>
           {alerts.slice(0, 10).map((alert) => (
