@@ -1,5 +1,5 @@
-import { Module } from '@nestjs/common';
-import { LiquidityService } from './liquidity.service';
+import { Module } from '@nestjs/common'
+import { LiquidityService } from './liquidity.service'
 
 @Module({
   providers: [LiquidityService],

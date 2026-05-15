@@ -1,13 +1,14 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { MongooseModule } from '@nestjs/mongoose';
-import { RedisModule } from './common/redis/redis.module';
-import { FeedModule } from './modules/feed/feed.module';
-import { CircuitBreakerModule } from './modules/circuit-breaker/circuit-breaker.module';
-import { PriceModule } from './modules/price/price.module';
-import { LiquidityModule } from './modules/liquidity/liquidity.module';
-import { AlertModule } from './modules/alert/alert.module';
-import { GatewayModule } from './modules/gateway/gateway.module';
+import { Module } from '@nestjs/common'
+import { ConfigModule, ConfigService } from '@nestjs/config'
+import { MongooseModule } from '@nestjs/mongoose'
+import { RedisModule } from './common/redis/redis.module'
+import { FeedModule } from './modules/feed/feed.module'
+import { CircuitBreakerModule } from './modules/circuit-breaker/circuit-breaker.module'
+import { PriceModule } from './modules/price/price.module'
+import { LiquidityModule } from './modules/liquidity/liquidity.module'
+import { AlertModule } from './modules/alert/alert.module'
+import { GatewayModule } from './modules/gateway/gateway.module'
+import { NatsModule } from 'src/common/nats/nats.module'
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { GatewayModule } from './modules/gateway/gateway.module';
       }),
       inject: [ConfigService],
     }),
+    NatsModule,
     RedisModule,
     FeedModule,
     CircuitBreakerModule,

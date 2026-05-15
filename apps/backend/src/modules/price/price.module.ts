@@ -1,9 +1,9 @@
-import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import { PriceService } from './price.service';
-import { PriceRecord, PriceSchema } from './price.schema';
-import { CircuitBreakerModule } from '../circuit-breaker/circuit-breaker.module';
-import { FeedModule } from '../feed/feed.module';
+import { Module } from '@nestjs/common'
+import { MongooseModule } from '@nestjs/mongoose'
+import { PriceService } from './price.service'
+import { PriceRecord, PriceSchema } from './price.schema'
+import { CircuitBreakerModule } from '../circuit-breaker/circuit-breaker.module'
+import { FeedModule } from '../feed/feed.module'
 
 @Module({
   imports: [

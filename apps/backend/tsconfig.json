@@ -23,6 +23,6 @@
     "noFallthroughCasesInSwitch": false,
     "paths": {
       "@ledn/shared": ["../../packages/shared/dist/index.d.ts"]
-    },
-  },
+    }
+  }
 }
