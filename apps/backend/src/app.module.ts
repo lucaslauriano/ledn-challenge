@@ -2,6 +2,12 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { RedisModule } from './common/redis/redis.module';
+import { FeedModule } from './modules/feed/feed.module';
+import { CircuitBreakerModule } from './modules/circuit-breaker/circuit-breaker.module';
+import { PriceModule } from './modules/price/price.module';
+import { LiquidityModule } from './modules/liquidity/liquidity.module';
+import { AlertModule } from './modules/alert/alert.module';
+import { GatewayModule } from './modules/gateway/gateway.module';
 
 @Module({
   imports: [
@@ -17,6 +23,12 @@ import { RedisModule } from './common/redis/redis.module';
       inject: [ConfigService],
     }),
     RedisModule,
+    FeedModule,
+    CircuitBreakerModule,
+    PriceModule,
+    LiquidityModule,
+    AlertModule,
+    GatewayModule,
   ],
 })
 export class AppModule {}
