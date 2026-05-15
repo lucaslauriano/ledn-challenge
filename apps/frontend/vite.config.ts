@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
-      '@ledn/shared': resolve(__dirname, '../../packages/shared/dist/index.js'),
+      '@ledn/shared': resolve(__dirname, '../../packages/shared/src/index.ts'),
     },
   },
   server: {
