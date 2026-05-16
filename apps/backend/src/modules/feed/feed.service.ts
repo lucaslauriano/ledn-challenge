@@ -158,8 +158,6 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
         ? healthyPrice * this.driftMultiplier
         : healthyPrice
 
-    BASE_PRICES[assetId] = price
-
     return {
       assetId,
       price: parseFloat(price.toFixed(2)),

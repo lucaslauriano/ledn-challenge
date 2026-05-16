@@ -132,4 +132,19 @@ describe('LiquidityService', () => {
       ]),
     )
   })
+
+  it('keeps available and locked stable during background source updates', async () => {
+    const afterLock = await service.lockFunds(25_000)
+
+    ;(
+      service as unknown as {
+        simulateSourceUpdates: () => void
+      }
+    ).simulateSourceUpdates()
+
+    const afterSimulation = service.getSnapshot()
+
+    expect(afterSimulation.available).toBe(afterLock.available)
+    expect(afterSimulation.locked).toBe(afterLock.locked)
+  })
 })

@@ -77,4 +77,14 @@ describe('FeedService', () => {
       }),
     )
   })
+
+  it('keeps healthy prices bounded around the reference price', () => {
+    const ticks = Array.from({ length: 100 }, () => generateTick(service, 'BTC'))
+    const prices = ticks
+      .filter((tick): tick is PriceTick => tick !== null)
+      .map((tick) => tick.price)
+
+    expect(Math.max(...prices)).toBeLessThan(66_000)
+    expect(Math.min(...prices)).toBeGreaterThan(64_000)
+  })
 })

@@ -222,14 +222,14 @@ export class LiquidityService implements OnModuleInit {
   private simulateSourceUpdates() {
     this.tick += 1
 
-    this.applyWave('internal-ledger', 0.004)
+    // Keep available/locked stable so operator lock/release actions are obvious.
     this.applyWave('settlement-rail', 0.012)
 
     if (this.tick % 4 === 0) {
       this.sources.custodian.status = LiquiditySourceState.DELAYED
     } else {
-      this.applyWave('custodian', 0.003)
       this.sources.custodian.status = LiquiditySourceState.HEALTHY
+      this.touchSource('custodian')
     }
   }
 
