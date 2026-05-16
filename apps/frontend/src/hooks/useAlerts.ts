@@ -7,6 +7,6 @@ export function useAlerts() {
 
 export function useActiveAlerts() {
   return useStore(
-    useShallow((s) => s.alerts.filter((a) => !a.resolved))
+    useShallow((s) => s.alerts.filter((a) => a.isActive))
   )
 }

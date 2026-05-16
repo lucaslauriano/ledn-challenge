@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type {
   PriceRecord,
   LiquiditySnapshot,
-  Alert,
+  AlertEvent,
 } from '@ledn/shared'
 
 import {
@@ -29,8 +29,8 @@ interface AppStore {
   setLiquidity: (liquidity: LiquiditySnapshot) => void
 
   // Alerts
-  alerts: Alert[]
-  addAlert: (alert: Alert) => void
+  alerts: AlertEvent[]
+  addAlert: (alert: AlertEvent) => void
   resolveAlert: (id: string) => void
 
   // Connection
@@ -57,11 +57,16 @@ export const useStore = create<AppStore>((set) => ({
 
   alerts: [],
   addAlert: (alert) =>
-    set((s) => ({ alerts: [alert, ...s.alerts].slice(0, 50) })),
+    set((s) => ({
+      alerts: [alert, ...s.alerts.filter((item) => item.id !== alert.id)].slice(
+        0,
+        50,
+      ),
+    })),
   resolveAlert: (id) =>
     set((s) => ({
       alerts: s.alerts.map((a) =>
-        a.id === id ? { ...a, resolved: true } : a,
+        a.id === id ? { ...a, isActive: false, resolvedAt: Date.now() } : a,
       ),
     })),
 
