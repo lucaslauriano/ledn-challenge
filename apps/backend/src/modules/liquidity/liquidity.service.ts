@@ -1,66 +1,332 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
-import { WsEvent } from '@ledn/shared'
+import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common'
+import {
+  AlertSeverity,
+  AlertType,
+  DataConfidence,
+  LiquidityConfidence,
+  LiquiditySnapshot,
+  LiquiditySourceState,
+  LiquiditySourceStatus,
+  PriceRecord,
+  WsEventType,
+} from '@ledn/shared'
 import { NatsService } from '../../common/nats/nats.service'
+import { APP_CONSTANTS } from '../../config/constants'
+import { AlertService } from '../alert/alert.service'
+import { applyLiquidityPolicy } from './liquidity-policy'
+
+interface SourceRuntimeState {
+  sourceId: string
+  amount: number
+  updatedAt: number
+  status: LiquiditySourceState
+}
+
+export interface AuditEntry {
+  id: string
+  type: 'LOCK' | 'RELEASE'
+  amount: number
+  operatorId: string
+  timestamp: number
+}
 
 @Injectable()
 export class LiquidityService implements OnModuleInit {
   private readonly logger = new Logger(LiquidityService.name)
+  private readonly intervalMs = APP_CONSTANTS.liquidity.intervalMs
+  private readonly lowAvailableRatio = APP_CONSTANTS.liquidity.lowAvailableRatio
+  private readonly staleSourceThresholdMs =
+    APP_CONSTANTS.liquidity.staleSourceThresholdMs
 
-  private snapshot = {
-    available: 1_250_000,
-    locked: 320_000,
-    inFlight: 85_000,
-    total: 1_655_000,
-    updatedAt: new Date().toISOString(),
+  private tick = 0
+  private auditTrail: AuditEntry[] = []
+  private readonly degradedAssets = new Set<string>()
+  private lastConservativeMode = false
+
+  private readonly sources: Record<string, SourceRuntimeState> = {
+    [APP_CONSTANTS.liquidity.sources.internalLedger.sourceId]: {
+      sourceId: APP_CONSTANTS.liquidity.sources.internalLedger.sourceId,
+      amount: APP_CONSTANTS.liquidity.sources.internalLedger.baseAmount,
+      updatedAt: Date.now(),
+      status: LiquiditySourceState.HEALTHY,
+    },
+    [APP_CONSTANTS.liquidity.sources.custodian.sourceId]: {
+      sourceId: APP_CONSTANTS.liquidity.sources.custodian.sourceId,
+      amount: APP_CONSTANTS.liquidity.sources.custodian.baseAmount,
+      updatedAt: Date.now(),
+      status: LiquiditySourceState.HEALTHY,
+    },
+    [APP_CONSTANTS.liquidity.sources.settlementRail.sourceId]: {
+      sourceId: APP_CONSTANTS.liquidity.sources.settlementRail.sourceId,
+      amount: APP_CONSTANTS.liquidity.sources.settlementRail.baseAmount,
+      updatedAt: Date.now(),
+      status: LiquiditySourceState.HEALTHY,
+    },
   }
 
-  constructor(private readonly nats: NatsService) {}
+  private snapshot: LiquiditySnapshot = this.buildSnapshot()
+
+  constructor(
+    private readonly nats: NatsService,
+    private readonly alertService: AlertService,
+  ) {}
 
   onModuleInit() {
+    this.nats.subscribe<PriceRecord>(WsEventType.PRICE_UPDATED, (price) => {
+      void this.handlePriceConfidence(price)
+    })
+
     setInterval(() => {
-      const snapshot = this.getSnapshot()
-      this.nats.publish(WsEvent.LIQUIDITY_UPDATED, snapshot)
-    }, 2000)
+      this.simulateSourceUpdates()
+      void this.refreshSnapshot()
+    }, this.intervalMs)
   }
 
   getSnapshot() {
-    const available: number = this.fluctuate(this.snapshot.available, 0.02)
-    const inFlight: number = this.fluctuate(this.snapshot.inFlight, 0.05)
-
-    this.snapshot = {
-      ...this.snapshot,
-      available,
-      inFlight,
-      updatedAt: new Date().toISOString(),
-    }
-
-    this.snapshot.total =
-      this.snapshot.available + this.snapshot.locked + this.snapshot.inFlight
-
     return this.snapshot
   }
 
-  lockFunds(amount: number): void {
-    if (amount > this.snapshot.available) {
-      throw new Error('Insufficient available funds')
+  getAuditTrail() {
+    return this.auditTrail.slice(0, 20)
+  }
+
+  async lockFunds(amount: number) {
+    this.validateAmount(amount)
+
+    this.snapshot = this.buildSnapshot()
+    const availableForLock = this.snapshot.availableAdjusted ?? this.snapshot.available
+
+    if (amount > availableForLock) {
+      if (this.snapshot.conservativeMode) {
+        this.logger.warn(
+          JSON.stringify({
+            event: 'liquidity.lock_blocked',
+            reason: 'CONSERVATIVE_MODE',
+            amount,
+            availableAdjusted: availableForLock,
+            degradedAssets: this.snapshot.degradedAssets,
+          }),
+        )
+        throw new BadRequestException(
+          `Insufficient conservative liquidity. Max available while pricing is degraded: ${availableForLock}`,
+        )
+      }
+
+      throw new BadRequestException('Insufficient available funds')
     }
-    this.snapshot.available -= amount
-    this.snapshot.locked += amount
-    this.snapshot.updatedAt = new Date().toISOString()
-    this.logger.log(`Locked ${amount} — available: ${this.snapshot.available}`)
-  }
 
-  releaseFunds(amount: number): void {
-    this.snapshot.locked -= amount
-    this.snapshot.available += amount
-    this.snapshot.updatedAt = new Date().toISOString()
+    this.sources['internal-ledger'].amount -= amount
+    this.sources.custodian.amount += amount
+    this.touchSource('internal-ledger')
+    this.touchSource('custodian')
+    this.recordAudit('LOCK', amount)
     this.logger.log(
-      `Released ${amount} — available: ${this.snapshot.available}`,
+      JSON.stringify({
+        event: 'liquidity.locked',
+        amount,
+        operatorId: 'demo-operator',
+        available: this.sources['internal-ledger'].amount,
+        locked: this.sources.custodian.amount,
+      }),
     )
+
+    await this.refreshSnapshot()
+    return this.snapshot
   }
 
-  private fluctuate(value: number, factor: number): number {
-    const delta = value * factor * (Math.random() - 0.5)
-    return parseFloat((value + delta).toFixed(2))
+  async releaseFunds(amount: number) {
+    this.validateAmount(amount)
+
+    if (amount > this.sources.custodian.amount) {
+      throw new BadRequestException('Insufficient locked funds')
+    }
+
+    this.sources.custodian.amount -= amount
+    this.sources['internal-ledger'].amount += amount
+    this.touchSource('internal-ledger')
+    this.touchSource('custodian')
+    this.recordAudit('RELEASE', amount)
+    this.logger.log(
+      JSON.stringify({
+        event: 'liquidity.released',
+        amount,
+        operatorId: 'demo-operator',
+        available: this.sources['internal-ledger'].amount,
+        locked: this.sources.custodian.amount,
+      }),
+    )
+
+    await this.refreshSnapshot()
+    return this.snapshot
+  }
+
+  private async refreshSnapshot() {
+    const nextSnapshot = this.buildSnapshot()
+    this.logConservativeModeTransition(nextSnapshot)
+    this.snapshot = nextSnapshot
+    await this.syncAlerts(this.snapshot)
+    this.nats.publish(WsEventType.LIQUIDITY_SNAPSHOT, this.snapshot)
+  }
+
+  private buildSnapshot(): LiquiditySnapshot {
+    const now = Date.now()
+    const sources = Object.values(this.sources).map((source) =>
+      this.toSourceStatus(source, now),
+    )
+    const available = this.sources['internal-ledger'].amount
+    const locked = this.sources.custodian.amount
+    const inFlight = this.sources['settlement-rail'].amount
+    const total = available + locked + inFlight
+    const degradedAssets = [...this.degradedAssets].sort()
+    const policy = applyLiquidityPolicy({ available, degradedAssets })
+    const confidence = sources.some(
+      (source) => source.status !== LiquiditySourceState.HEALTHY,
+    )
+      ? LiquidityConfidence.DEGRADED
+      : LiquidityConfidence.FRESH
+
+    return {
+      available,
+      locked,
+      inFlight,
+      total,
+      sources,
+      confidence,
+      conservativeMode: policy.conservativeMode,
+      availableAdjusted: policy.availableAdjusted,
+      degradedAssets,
+      timestamp: now,
+      updatedAt: Math.max(...sources.map((source) => source.updatedAt)),
+      schemaVersion: APP_CONSTANTS.schemaVersion,
+    }
+  }
+
+  private toSourceStatus(
+    source: SourceRuntimeState,
+    now: number,
+  ): LiquiditySourceStatus {
+    const ageMs = now - source.updatedAt
+    const status =
+      ageMs > this.staleSourceThresholdMs
+        ? LiquiditySourceState.OFFLINE
+        : source.status
+
+    return {
+      sourceId: source.sourceId,
+      amount: source.amount,
+      updatedAt: source.updatedAt,
+      status,
+    }
+  }
+
+  private simulateSourceUpdates() {
+    this.tick += 1
+
+    this.applyWave('internal-ledger', 0.004)
+    this.applyWave('settlement-rail', 0.012)
+
+    if (this.tick % 4 === 0) {
+      this.sources.custodian.status = LiquiditySourceState.DELAYED
+    } else {
+      this.applyWave('custodian', 0.003)
+      this.sources.custodian.status = LiquiditySourceState.HEALTHY
+    }
+  }
+
+  private applyWave(sourceId: string, factor: number) {
+    const source = this.sources[sourceId]
+    const delta = source.amount * factor * Math.sin(this.tick / 2)
+    source.amount = Math.max(0, parseFloat((source.amount + delta).toFixed(2)))
+    source.status = LiquiditySourceState.HEALTHY
+    this.touchSource(sourceId)
+  }
+
+  private touchSource(sourceId: string) {
+    this.sources[sourceId].updatedAt = Date.now()
+  }
+
+  private recordAudit(type: AuditEntry['type'], amount: number) {
+    this.auditTrail = [
+      {
+        id: `${type.toLowerCase()}-${Date.now()}`,
+        type,
+        amount,
+        operatorId: 'demo-operator',
+        timestamp: Date.now(),
+      },
+      ...this.auditTrail,
+    ].slice(0, 20)
+  }
+
+  private validateAmount(amount: number) {
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('Amount must be a positive number')
+    }
+  }
+
+  private async handlePriceConfidence(price: PriceRecord) {
+    if (price.confidence === DataConfidence.FRESH) {
+      this.degradedAssets.delete(price.assetId)
+    } else {
+      this.degradedAssets.add(price.assetId)
+    }
+
+    await this.refreshSnapshot()
+  }
+
+  private logConservativeModeTransition(snapshot: LiquiditySnapshot) {
+    if (snapshot.conservativeMode === this.lastConservativeMode) return
+
+    this.logger.warn(
+      JSON.stringify({
+        event: snapshot.conservativeMode
+          ? 'liquidity.conservative_mode_entered'
+          : 'liquidity.conservative_mode_exited',
+        conservativeMode: snapshot.conservativeMode,
+        available: snapshot.available,
+        availableAdjusted: snapshot.availableAdjusted,
+        degradedAssets: snapshot.degradedAssets,
+      }),
+    )
+
+    this.lastConservativeMode = snapshot.conservativeMode
+  }
+
+  private async syncAlerts(snapshot: LiquiditySnapshot) {
+    const availableRatio = snapshot.total === 0 ? 0 : snapshot.available / snapshot.total
+
+    if (availableRatio < this.lowAvailableRatio) {
+      this.nats.publish('alert.trigger', {
+        type: AlertType.LIQUIDITY_LOW,
+        severity: AlertSeverity.HIGH,
+        assetId: 'liquidity',
+        message: `Available liquidity dropped to ${(availableRatio * 100).toFixed(1)}%`,
+      })
+    } else {
+      await this.alertService.resolveByTypeAndResource(
+        AlertType.LIQUIDITY_LOW,
+        'liquidity',
+      )
+    }
+
+    const staleSource = snapshot.sources.find(
+      (source) => source.status !== LiquiditySourceState.HEALTHY,
+    )
+
+    if (staleSource) {
+      this.nats.publish('alert.trigger', {
+        type: AlertType.LIQUIDITY_SOURCE_STALE,
+        severity: AlertSeverity.HIGH,
+        assetId: staleSource.sourceId,
+        message: `${staleSource.sourceId} is ${staleSource.status.toLowerCase()}`,
+      })
+    } else {
+      for (const source of snapshot.sources) {
+        await this.alertService.resolveByTypeAndResource(
+          AlertType.LIQUIDITY_SOURCE_STALE,
+          source.sourceId,
+        )
+      }
+    }
   }
 }

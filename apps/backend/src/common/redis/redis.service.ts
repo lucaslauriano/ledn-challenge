@@ -30,6 +30,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.client.set(key, value);
   }
 
+  setIfNotExists(key: string, value: string) {
+    return this.client.set(key, value, 'NX');
+  }
+
   del(key: string) {
     return this.client.del(key);
   }

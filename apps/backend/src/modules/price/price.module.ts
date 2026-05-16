@@ -4,6 +4,7 @@ import { PriceService } from './price.service'
 import { PriceRecord, PriceSchema } from './price.schema'
 import { CircuitBreakerModule } from '../circuit-breaker/circuit-breaker.module'
 import { FeedModule } from '../feed/feed.module'
+import { AlertModule } from '../alert/alert.module'
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { FeedModule } from '../feed/feed.module'
     ]),
     CircuitBreakerModule,
     FeedModule,
+    AlertModule,
   ],
   providers: [PriceService],
   exports: [PriceService],

@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
 import { Document } from 'mongoose'
-import { DataConfidence, CircuitState } from '@ledn/shared'
+import { DataConfidence, FeedMode, PriceSource } from '@ledn/shared'
 
 export type PriceDocument = PriceRecord & Document
 
@@ -10,22 +10,31 @@ export class PriceRecord {
   assetId: string
 
   @Prop({ required: true })
-  price: number
+  value: number
 
   @Prop({ required: true })
-  timestamp: Date
+  timestamp: number
+
+  @Prop({ required: true })
+  publishedAt: number
+
+  @Prop({ required: true })
+  receivedAt: number
 
   @Prop({ type: String, enum: DataConfidence, default: DataConfidence.FRESH })
   confidence: DataConfidence
 
-  @Prop({ type: String, enum: CircuitState, default: CircuitState.CLOSED })
-  circuitState: CircuitState
+  @Prop({ type: String, enum: PriceSource, default: PriceSource.LIVE })
+  source: PriceSource
 
-  @Prop({ default: 'LIVE' })
-  source: string
+  @Prop({ type: String, enum: FeedMode, default: FeedMode.HEALTHY })
+  feedMode: FeedMode
 
   @Prop({ default: 0 })
   ageMs: number
+
+  @Prop({ default: 1 })
+  schemaVersion: number
 }
 
 export const PriceSchema = SchemaFactory.createForClass(PriceRecord)

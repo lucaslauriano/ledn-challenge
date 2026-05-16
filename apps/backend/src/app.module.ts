@@ -9,6 +9,7 @@ import { LiquidityModule } from './modules/liquidity/liquidity.module'
 import { AlertModule } from './modules/alert/alert.module'
 import { GatewayModule } from './modules/gateway/gateway.module'
 import { NatsModule } from 'src/common/nats/nats.module'
+import { HealthModule } from './modules/health/health.module'
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { NatsModule } from 'src/common/nats/nats.module'
     LiquidityModule,
     AlertModule,
     GatewayModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

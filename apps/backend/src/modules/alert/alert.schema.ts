@@ -6,10 +6,10 @@ export type AlertDocument = AlertRecord & Document
 
 @Schema({ timestamps: true })
 export class AlertRecord {
-  @Prop({ enum: AlertType, required: true })
+  @Prop({ type: String, enum: AlertType, required: true })
   type: AlertType
 
-  @Prop({ enum: AlertSeverity, required: true })
+  @Prop({ type: String, enum: AlertSeverity, required: true })
   severity: AlertSeverity
 
   @Prop()

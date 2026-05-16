@@ -5,8 +5,10 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { FeedMode } from '@ledn/shared'
+import { FeedMode, FeedScenario, WsEventType } from '@ledn/shared'
 import { NatsService } from '../../common/nats/nats.service'
+import { APP_CONSTANTS } from '../../config/constants'
+import { FEED_SCENARIOS } from './scenarios'
 
 export interface PriceTick {
   assetId: string
@@ -29,13 +31,31 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
   }
   private intervalMs: number
   private intervals: Map<string, NodeJS.Timeout> = new Map()
+  private scenarioTimeouts: NodeJS.Timeout[] = []
   private handlers: Array<(tick: PriceTick) => void> = []
+  private sequenceByAsset: Record<string, number> = {
+    BTC: 0,
+    ETH: 0,
+  }
+  private readonly delayedEveryNthTick: number
+  private readonly driftMultiplier: number
 
   constructor(
     private readonly config: ConfigService,
     private readonly nats: NatsService,
   ) {
-    this.intervalMs = this.config.get<number>('FEED_INTERVAL_MS', 1000)
+    this.intervalMs = this.config.get<number>(
+      'FEED_INTERVAL_MS',
+      APP_CONSTANTS.feed.intervalMs,
+    )
+    this.delayedEveryNthTick = this.config.get<number>(
+      'FEED_DELAYED_EVERY_NTH_TICK',
+      APP_CONSTANTS.feed.delayedEveryNthTick,
+    )
+    this.driftMultiplier = this.config.get<number>(
+      'FEED_DRIFT_MULTIPLIER',
+      APP_CONSTANTS.feed.driftMultiplier,
+    )
   }
 
   onModuleInit() {
@@ -48,11 +68,25 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
     for (const interval of this.intervals.values()) {
       clearInterval(interval)
     }
+    this.clearScenarioTimeouts()
   }
 
   setMode(assetId: string, mode: FeedMode) {
+    const previousMode = this.getMode(assetId)
     this.modes[assetId] = mode
-    this.logger.log(`Feed mode for ${assetId} set to ${mode}`)
+    this.logger.log(
+      JSON.stringify({
+        event: 'feed.mode_changed',
+        assetId,
+        previousMode,
+        mode,
+      }),
+    )
+    this.nats.publish(WsEventType.FEED_STATUS_CHANGED, {
+      assetId,
+      mode,
+      timestamp: Date.now(),
+    })
 
     if (mode === FeedMode.HEALTHY) {
       this.nats.publish('circuit.reset', { assetId })
@@ -71,6 +105,30 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
     this.handlers.push(handler)
   }
 
+  runScenario(scenario: FeedScenario) {
+    const steps = FEED_SCENARIOS[scenario]
+    if (!steps) {
+      this.logger.warn(`Ignoring unknown scenario ${scenario}`)
+      return
+    }
+
+    this.clearScenarioTimeouts()
+    this.logger.log(
+      JSON.stringify({
+        event: 'feed.scenario_started',
+        scenario,
+        steps: steps.length,
+      }),
+    )
+
+    for (const step of steps) {
+      const timeout = setTimeout(() => {
+        this.setMode(step.assetId, step.mode)
+      }, step.afterMs)
+      this.scenarioTimeouts.push(timeout)
+    }
+  }
+
   private startFeed(assetId: string) {
     const interval = setInterval(() => {
       const tick = this.generateTick(assetId)
@@ -84,19 +142,21 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
 
   private generateTick(assetId: string): PriceTick | null {
     const mode = this.modes[assetId]
+    this.sequenceByAsset[assetId] = (this.sequenceByAsset[assetId] ?? 0) + 1
+    const sequence = this.sequenceByAsset[assetId]
 
     if (mode === FeedMode.OFFLINE) return null
+    if (mode === FeedMode.DELAYED && sequence % this.delayedEveryNthTick !== 0) {
+      return null
+    }
 
     const base = BASE_PRICES[assetId]
-    let price = base
-
-    if (mode === FeedMode.DRIFTED) {
-      price = base * (1 + (Math.random() - 0.3) * 0.1)
-    } else if (mode === FeedMode.DELAYED) {
-      price = base * (1 + (Math.random() - 0.5) * 0.02)
-    } else {
-      price = base * (1 + (Math.random() - 0.5) * 0.005)
-    }
+    const wave = Math.sin(sequence / 3) * 0.0035
+    const healthyPrice = base * (1 + wave)
+    const price =
+      mode === FeedMode.DRIFTED
+        ? healthyPrice * this.driftMultiplier
+        : healthyPrice
 
     BASE_PRICES[assetId] = price
 
@@ -106,5 +166,12 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
       timestamp: new Date(),
       mode,
     }
+  }
+
+  private clearScenarioTimeouts() {
+    for (const timeout of this.scenarioTimeouts) {
+      clearTimeout(timeout)
+    }
+    this.scenarioTimeouts = []
   }
 }

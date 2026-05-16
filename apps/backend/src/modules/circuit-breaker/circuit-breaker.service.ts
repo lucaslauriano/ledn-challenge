@@ -1,8 +1,14 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { CircuitState, WsEvent, AlertType, AlertSeverity } from '@ledn/shared'
+import {
+  AlertSeverity,
+  AlertType,
+  CircuitState,
+  WsEventType,
+} from '@ledn/shared'
 import { RedisService } from '../../common/redis/redis.service'
 import { NatsService } from '../../common/nats/nats.service'
+import { AlertService } from '../alert/alert.service'
 
 const KEYS = {
   state: (assetId: string) => `circuit:${assetId}:state`,
@@ -21,6 +27,7 @@ export class CircuitBreakerService implements OnModuleInit {
     private readonly redis: RedisService,
     private readonly config: ConfigService,
     private readonly nats: NatsService,
+    private readonly alertService: AlertService,
   ) {
     this.failureThreshold = this.config.get<number>('CB_FAILURE_THRESHOLD', 3)
     this.successThreshold = this.config.get<number>('CB_SUCCESS_THRESHOLD', 2)
@@ -44,6 +51,20 @@ export class CircuitBreakerService implements OnModuleInit {
         const elapsed = Date.now() - parseInt(lastFailure)
         if (elapsed >= this.timeoutMs) {
           await this.setState(assetId, CircuitState.HALF_OPEN)
+          this.logger.warn(
+            JSON.stringify({
+              event: 'circuit.state_changed',
+              assetId,
+              previousState: CircuitState.OPEN,
+              state: CircuitState.HALF_OPEN,
+              elapsedMs: elapsed,
+            }),
+          )
+          this.nats.publish(WsEventType.CIRCUIT_STATE_CHANGED, {
+            assetId,
+            state: CircuitState.HALF_OPEN,
+            timestamp: Date.now(),
+          })
           return CircuitState.HALF_OPEN
         }
       }
@@ -59,7 +80,6 @@ export class CircuitBreakerService implements OnModuleInit {
       const successes = await this.redis.incr(`circuit:${assetId}:successes`)
       if (successes >= this.successThreshold) {
         await this.reset(assetId)
-        this.logger.log(`Circuit CLOSED for ${assetId}`)
         return CircuitState.CLOSED
       }
     }
@@ -77,12 +97,20 @@ export class CircuitBreakerService implements OnModuleInit {
       currentState !== CircuitState.OPEN
     ) {
       await this.setState(assetId, CircuitState.OPEN)
-      this.logger.warn(`Circuit OPEN for ${assetId} after ${failures} failures`)
+      this.logger.warn(
+        JSON.stringify({
+          event: 'circuit.state_changed',
+          assetId,
+          previousState: currentState,
+          state: CircuitState.OPEN,
+          failures,
+        }),
+      )
 
-      this.nats.publish(WsEvent.CIRCUIT_STATE_CHANGED, {
+      this.nats.publish(WsEventType.CIRCUIT_STATE_CHANGED, {
         assetId,
         state: CircuitState.OPEN,
-        timestamp: new Date().toISOString(),
+        timestamp: Date.now(),
       })
 
       this.nats.publish('alert.trigger', {
@@ -106,16 +134,30 @@ export class CircuitBreakerService implements OnModuleInit {
   }
 
   async reset(assetId: string): Promise<void> {
+    const previousState = await this.redis.get(KEYS.state(assetId))
     await this.setState(assetId, CircuitState.CLOSED)
     await this.redis.del(KEYS.failures(assetId))
     await this.redis.del(KEYS.lastFailure(assetId))
     await this.redis.del(`circuit:${assetId}:successes`)
 
-    this.nats.publish(WsEvent.CIRCUIT_STATE_CHANGED, {
+    this.logger.log(
+      JSON.stringify({
+        event: 'circuit.state_changed',
+        assetId,
+        previousState: previousState ?? CircuitState.CLOSED,
+        state: CircuitState.CLOSED,
+      }),
+    )
+
+    this.nats.publish(WsEventType.CIRCUIT_STATE_CHANGED, {
       assetId,
       state: CircuitState.CLOSED,
-      timestamp: new Date().toISOString(),
+      timestamp: Date.now(),
     })
+    await this.alertService.resolveByTypeAndResource(
+      AlertType.CIRCUIT_OPEN,
+      assetId,
+    )
   }
 
   private async setState(assetId: string, state: CircuitState): Promise<void> {

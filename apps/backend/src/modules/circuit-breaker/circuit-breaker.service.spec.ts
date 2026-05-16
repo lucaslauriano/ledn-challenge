@@ -2,7 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { ConfigService } from '@nestjs/config'
 import { CircuitBreakerService } from './circuit-breaker.service'
 import { RedisService } from '../../common/redis/redis.service'
-import { CircuitState } from '@ledn/shared'
+import { CircuitState, WsEventType } from '@ledn/shared'
+import { NatsService } from '../../common/nats/nats.service'
+import { AlertService } from '../alert/alert.service'
 
 const mockRedis = {
   get: jest.fn(),
@@ -23,6 +25,15 @@ const mockConfig = {
   }),
 }
 
+const mockNats = {
+  publish: jest.fn(),
+  subscribe: jest.fn(),
+}
+
+const mockAlertService = {
+  resolveByTypeAndResource: jest.fn(),
+}
+
 describe('CircuitBreakerService', () => {
   let service: CircuitBreakerService
 
@@ -34,6 +45,8 @@ describe('CircuitBreakerService', () => {
         CircuitBreakerService,
         { provide: RedisService, useValue: mockRedis },
         { provide: ConfigService, useValue: mockConfig },
+        { provide: NatsService, useValue: mockNats },
+        { provide: AlertService, useValue: mockAlertService },
       ],
     }).compile()
 
@@ -69,6 +82,13 @@ describe('CircuitBreakerService', () => {
       const state = await service.getState('BTC')
 
       expect(state).toBe(CircuitState.HALF_OPEN)
+      expect(mockNats.publish).toHaveBeenCalledWith(
+        WsEventType.CIRCUIT_STATE_CHANGED,
+        expect.objectContaining({
+          assetId: 'BTC',
+          state: CircuitState.HALF_OPEN,
+        }),
+      )
     })
   })
 

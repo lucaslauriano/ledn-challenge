@@ -6,7 +6,9 @@ import { PriceRecord } from './price.schema'
 import { RedisService } from '../../common/redis/redis.service'
 import { CircuitBreakerService } from '../circuit-breaker/circuit-breaker.service'
 import { FeedService } from '../feed/feed.service'
-import { DataConfidence, CircuitState } from '@ledn/shared'
+import { AlertType, DataConfidence, FeedMode, PriceSource } from '@ledn/shared'
+import { NatsService } from '../../common/nats/nats.service'
+import { AlertService } from '../alert/alert.service'
 
 const mockRedis = {
   get: jest.fn(),
@@ -36,6 +38,14 @@ const mockConfig = {
   }),
 }
 
+const mockNats = {
+  publish: jest.fn(),
+}
+
+const mockAlertService = {
+  resolveByTypeAndResource: jest.fn(),
+}
+
 describe('PriceService', () => {
   let service: PriceService
 
@@ -50,6 +60,8 @@ describe('PriceService', () => {
         { provide: FeedService, useValue: mockFeed },
         { provide: ConfigService, useValue: mockConfig },
         { provide: getModelToken(PriceRecord.name), useValue: mockPriceModel },
+        { provide: NatsService, useValue: mockNats },
+        { provide: AlertService, useValue: mockAlertService },
       ],
     }).compile()
 
@@ -60,12 +72,15 @@ describe('PriceService', () => {
     it('should return FRESH price from cache when circuit is closed', async () => {
       const cachedPrice = {
         assetId: 'BTC',
-        price: 65000,
-        timestamp: new Date().toISOString(),
+        value: 65000,
+        timestamp: Date.now(),
+        publishedAt: Date.now(),
+        receivedAt: Date.now(),
         confidence: DataConfidence.FRESH,
-        circuitState: CircuitState.CLOSED,
-        source: 'LIVE',
+        source: PriceSource.LIVE,
+        feedMode: FeedMode.HEALTHY,
         ageMs: 0,
+        schemaVersion: 1,
       }
 
       mockCircuitBreaker.isOpen.mockResolvedValue(false)
@@ -75,18 +90,22 @@ describe('PriceService', () => {
 
       expect(result).not.toBeNull()
       expect(result?.confidence).toBe(DataConfidence.FRESH)
-      expect(result?.source).toBe('LIVE')
+      expect(result?.source).toBe(PriceSource.LIVE)
     })
 
     it('should return STALE price when cache is old', async () => {
-      const oldTimestamp = new Date(Date.now() - 10000).toISOString()
+      const oldTimestamp = Date.now() - 10000
       const cachedPrice = {
         assetId: 'BTC',
-        price: 65000,
+        value: 65000,
         timestamp: oldTimestamp,
+        publishedAt: oldTimestamp,
+        receivedAt: oldTimestamp,
         confidence: DataConfidence.FRESH,
-        source: 'LIVE',
+        source: PriceSource.LIVE,
+        feedMode: FeedMode.DELAYED,
         ageMs: 0,
+        schemaVersion: 1,
       }
 
       mockCircuitBreaker.isOpen.mockResolvedValue(false)
@@ -100,10 +119,14 @@ describe('PriceService', () => {
     it('should return fallback from cache when circuit is open', async () => {
       const cachedPrice = {
         assetId: 'BTC',
-        price: 65000,
-        timestamp: new Date().toISOString(),
-        source: 'LIVE',
+        value: 65000,
+        timestamp: Date.now(),
+        publishedAt: Date.now(),
+        receivedAt: Date.now(),
+        source: PriceSource.LIVE,
+        feedMode: FeedMode.HEALTHY,
         ageMs: 0,
+        schemaVersion: 1,
       }
 
       mockCircuitBreaker.isOpen.mockResolvedValue(true)
@@ -111,7 +134,7 @@ describe('PriceService', () => {
 
       const result = await service.getCurrentPrice('BTC')
 
-      expect(result?.source).toBe('CACHE')
+      expect(result?.source).toBe(PriceSource.CACHE)
       expect(result?.confidence).toBe(DataConfidence.STALE)
     })
 
@@ -125,6 +148,39 @@ describe('PriceService', () => {
       const result = await service.getCurrentPrice('BTC')
 
       expect(result).toBeNull()
+    })
+  })
+
+  describe('price ticks', () => {
+    it('publishes PRICE_DRIFT alerts for drifted ticks', async () => {
+      mockRedis.set.mockResolvedValue('OK')
+      mockPriceModel.create.mockResolvedValue({})
+      mockCircuitBreaker.recordSuccess.mockResolvedValue(undefined)
+      mockAlertService.resolveByTypeAndResource.mockResolvedValue(undefined)
+
+      await (
+        service as unknown as {
+          handleTick: (tick: {
+            assetId: string
+            price: number
+            timestamp: Date
+            mode: FeedMode
+          }) => Promise<void>
+        }
+      ).handleTick({
+        assetId: 'ETH',
+        price: 3500,
+        timestamp: new Date(),
+        mode: FeedMode.DRIFTED,
+      })
+
+      expect(mockNats.publish).toHaveBeenCalledWith(
+        'alert.trigger',
+        expect.objectContaining({
+          type: AlertType.PRICE_DRIFT,
+          assetId: 'ETH',
+        }),
+      )
     })
   })
 })

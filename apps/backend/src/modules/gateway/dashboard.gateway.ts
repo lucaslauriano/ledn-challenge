@@ -8,7 +8,13 @@ import {
 } from '@nestjs/websockets'
 import { Server, Socket } from 'socket.io'
 import { Logger, OnModuleInit } from '@nestjs/common'
-import { WsEvent, FeedMode } from '@ledn/shared'
+import {
+  FeedMode,
+  FeedScenario,
+  WS_EVENT_CHANNEL,
+  WsEvent,
+  WsEventType,
+} from '@ledn/shared'
 import { PriceService } from '../price/price.service'
 import { LiquidityService } from '../liquidity/liquidity.service'
 import { AlertService } from '../alert/alert.service'
@@ -36,24 +42,46 @@ export class DashboardGateway
   ) {}
 
   onModuleInit() {
-    this.nats.subscribe(WsEvent.PRICE_UPDATED, (data: unknown) => {
-      this.server.emit(WsEvent.PRICE_UPDATED, data)
+    this.nats.subscribe(WsEventType.PRICE_UPDATED, (data: unknown) => {
+      this.emitEvent({
+        type: WsEventType.PRICE_UPDATED,
+        payload: data,
+      })
     })
 
-    this.nats.subscribe(WsEvent.LIQUIDITY_UPDATED, (data: unknown) => {
-      this.server.emit(WsEvent.LIQUIDITY_UPDATED, data)
+    this.nats.subscribe(WsEventType.LIQUIDITY_SNAPSHOT, (data: unknown) => {
+      this.emitEvent({
+        type: WsEventType.LIQUIDITY_SNAPSHOT,
+        payload: data,
+      })
     })
 
-    this.nats.subscribe(WsEvent.ALERT_CREATED, (data: unknown) => {
-      this.server.emit(WsEvent.ALERT_CREATED, data)
+    this.nats.subscribe(WsEventType.ALERT_CREATED, (data: unknown) => {
+      this.emitEvent({
+        type: WsEventType.ALERT_CREATED,
+        payload: data,
+      })
     })
 
-    this.nats.subscribe(WsEvent.CIRCUIT_STATE_CHANGED, (data: unknown) => {
-      this.server.emit(WsEvent.CIRCUIT_STATE_CHANGED, data)
+    this.nats.subscribe(WsEventType.ALERT_RESOLVED, (data: unknown) => {
+      this.emitEvent({
+        type: WsEventType.ALERT_RESOLVED,
+        payload: data,
+      })
     })
 
-    this.nats.subscribe(WsEvent.FEED_STATUS_CHANGED, (data: unknown) => {
-      this.server.emit(WsEvent.FEED_STATUS_CHANGED, data)
+    this.nats.subscribe(WsEventType.CIRCUIT_STATE_CHANGED, (data: unknown) => {
+      this.emitEvent({
+        type: WsEventType.CIRCUIT_STATE_CHANGED,
+        payload: data,
+      })
+    })
+
+    this.nats.subscribe(WsEventType.FEED_STATUS_CHANGED, (data: unknown) => {
+      this.emitEvent({
+        type: WsEventType.FEED_STATUS_CHANGED,
+        payload: data,
+      })
     })
 
     this.logger.log('Subscribed to all NATS subjects')
@@ -71,11 +99,11 @@ export class DashboardGateway
   @SubscribeMessage('set_feed_mode')
   handleSetFeedMode(@MessageBody() data: { assetId: string; mode: FeedMode }) {
     this.feedService.setMode(data.assetId, data.mode)
-    this.nats.publish(WsEvent.FEED_STATUS_CHANGED, {
-      assetId: data.assetId,
-      mode: data.mode,
-      timestamp: new Date().toISOString(),
-    })
+  }
+
+  @SubscribeMessage('run_feed_scenario')
+  handleRunFeedScenario(@MessageBody() data: { scenario: FeedScenario }) {
+    this.feedService.runScenario(data.scenario)
   }
 
   private async sendInitialState(client: Socket) {
@@ -85,6 +113,13 @@ export class DashboardGateway
       this.alertService.findActive(),
     ])
 
-    client.emit('initial_state', { prices, liquidity, alerts })
+    client.emit(WS_EVENT_CHANNEL, {
+      type: WsEventType.INITIAL_STATE,
+      payload: { prices, liquidity, alerts },
+    } satisfies WsEvent)
+  }
+
+  private emitEvent(event: WsEvent) {
+    this.server.emit(WS_EVENT_CHANNEL, event)
   }
 }
