@@ -1,0 +1,16 @@
+export const WS_EVENT_CHANNEL = 'ws:event'
+
+export enum WsEventType {
+  INITIAL_STATE = 'INITIAL_STATE',
+  PRICE_UPDATED = 'PRICE_UPDATED',
+  CIRCUIT_STATE_CHANGED = 'CIRCUIT_STATE_CHANGED',
+  FEED_STATUS_CHANGED = 'FEED_STATUS_CHANGED',
+  ALERT_CREATED = 'ALERT_CREATED',
+  ALERT_RESOLVED = 'ALERT_RESOLVED',
+  LIQUIDITY_SNAPSHOT = 'LIQUIDITY_SNAPSHOT',
+}
+
+export interface WsEvent<T = unknown> {
+  type: WsEventType
+  payload: T
+}
