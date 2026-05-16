@@ -8,7 +8,13 @@ import type {
 import {
   CircuitState,
   FeedMode,
+  FeedScenario,
 } from '@ledn/shared'
+
+type ActiveSimulation = {
+  scenario: FeedScenario
+  label: string
+}
 
 interface AppStore {
   // Prices
@@ -36,6 +42,11 @@ interface AppStore {
   // Connection
   connected: boolean
   setConnected: (connected: boolean) => void
+
+  // Simulation
+  activeSimulation: ActiveSimulation | null
+  setActiveSimulation: (simulation: ActiveSimulation) => void
+  clearActiveSimulation: () => void
 }
 
 export const useStore = create<AppStore>((set) => ({
@@ -72,4 +83,8 @@ export const useStore = create<AppStore>((set) => ({
 
   connected: false,
   setConnected: (connected) => set({ connected }),
+
+  activeSimulation: null,
+  setActiveSimulation: (simulation) => set({ activeSimulation: simulation }),
+  clearActiveSimulation: () => set({ activeSimulation: null }),
 }))

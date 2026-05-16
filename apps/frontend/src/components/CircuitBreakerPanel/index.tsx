@@ -23,24 +23,42 @@ export function CircuitBreakerPanel() {
   const assets = ['BTC', 'ETH']
 
   return (
-    <Box p={4} borderWidth={1} borderRadius="lg" w="100%">
-      <Heading size="sm" mb={3}>Circuit Breaker</Heading>
-      <Separator mb={3} />
+    <Box
+      p={4}
+      borderWidth={1}
+      borderColor="#d7dce8"
+      _dark={{ borderColor: '#262626', bg: '#0a0a0a' }}
+      borderRadius="md"
+      bg="#ffffff"
+      w="100%"
+    >
+      <Heading size="sm" mb={3} textTransform="uppercase" fontWeight="500" color="#344054" _dark={{ color: '#d4d4d4' }}>
+        Circuit Breakers
+      </Heading>
+      <Separator mb={3} borderColor="#d7dce8" _dark={{ borderColor: '#262626' }} />
       <VStack align="stretch" gap={3}>
         {assets.map((assetId) => {
           const state = circuitStates[assetId] ?? CircuitState.CLOSED
 
           return (
-            <HStack key={assetId} justify="space-between">
-              <Text fontWeight="bold">{assetId}</Text>
-              <HStack>
-                <Text fontSize="sm" color="gray.500">
+            <HStack
+              key={assetId}
+              justify="space-between"
+              p={3}
+              borderWidth={1}
+              borderColor="#d7dce8"
+              _dark={{ borderColor: '#262626', bg: '#111111' }}
+              borderRadius="md"
+            >
+              <Box>
+                <Text fontWeight="800" letterSpacing="-0.03em">{assetId}-USD-X</Text>
+                <Text fontSize="xs" color="#667085" _dark={{ color: '#a3a3a3' }}>
                   {stateDescription(state)}
                 </Text>
-                <Badge colorPalette={stateColor(state)}>
-                  {state}
-                </Badge>
-              </HStack>
+              </Box>
+              <Badge colorPalette={stateColor(state)} px={3} py={2} borderRadius="md" fontSize="sm">
+                {state}
+              </Badge>
             </HStack>
           )
         })}

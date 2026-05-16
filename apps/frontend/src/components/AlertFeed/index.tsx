@@ -25,20 +25,33 @@ export function AlertFeed() {
   const alerts = useActiveAlerts()
 
   return (
-    <Box p={4} borderWidth={1} borderRadius="lg" w="100%">
-      <HStack justify="space-between" mb={3}>
-        <Heading size="sm">Alerts</Heading>
-        <Badge colorPalette={alerts.length > 0 ? 'red' : 'green'}>
+    <Box
+      borderWidth={1}
+      borderColor="#d7dce8"
+      _dark={{ borderColor: '#262626', bg: '#0a0a0a' }}
+      borderRadius="md"
+      bg="#ffffff"
+      w="100%"
+      minH="258px"
+    >
+      <HStack justify="space-between" px={4} py={3} bg="#eaf2ff" _dark={{ bg: '#111111' }} borderTopRadius="md">
+        <Heading size="sm" textTransform="uppercase" fontWeight="500" color="#344054" _dark={{ color: '#d4d4d4' }}>
+          System Alerts
+        </Heading>
+        <Badge colorPalette={alerts.length > 0 ? 'red' : 'green'} px={2} py={1} borderRadius="md">
           {alerts.length} active
         </Badge>
       </HStack>
-      <Separator mb={3} />
+      <Separator borderColor="#d7dce8" _dark={{ borderColor: '#262626' }} />
       {alerts.length === 0 ? (
-        <Text fontSize="sm" color="gray.400">
-          No active alerts
-        </Text>
+        <VStack minH="200px" justify="center" color="#a3aab8" _dark={{ color: '#536982' }} gap={3}>
+          <Text fontSize="5xl" lineHeight="1">✓</Text>
+          <Text fontSize="sm" letterSpacing="0.18em" textTransform="uppercase">
+            No active alerts
+          </Text>
+        </VStack>
       ) : (
-        <VStack align="stretch" gap={2}>
+        <VStack align="stretch" gap={2} p={4}>
           {alerts.slice(0, 10).map((alert) => {
             const message = alert.payload?.message ?? alert.type
 
@@ -50,9 +63,10 @@ export function AlertFeed() {
                 borderWidth={1}
                 borderColor={`${severityColor(alert.severity)}.200`}
                 bg={`${severityColor(alert.severity)}.50`}
+                _dark={{ bg: '#171717', borderColor: '#404040' }}
               >
                 <HStack justify="space-between" mb={1}>
-                  <Badge colorPalette={severityColor(alert.severity)} size="sm">
+                  <Badge colorPalette={severityColor(alert.severity)} size="sm" px={2} py={1}>
                     {alert.severity}
                   </Badge>
                   <Text fontSize="xs" color="gray.400">
