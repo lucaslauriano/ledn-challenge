@@ -179,13 +179,13 @@ The UI exposes deterministic scenario buttons:
 
 Suggested walkthrough:
 
-1. Start healthy: BTC/ETH show `HEALTHY`, `FRESH`, `LIVE`, circuit breaker `CLOSED`.
+1. Start healthy: BTC/ETH show Healthy, Fresh, Live, and circuit breaker Closed.
 2. Run `BTC_GOES_OFFLINE`: BTC moves through delayed/offline behavior, price confidence degrades, alerts appear, and circuit state changes.
 3. Watch liquidity enter conservative mode: the dashboard shows raw available and conservative available.
 4. Try to lock more than conservative available: the backend rejects the action with an explicit conservative-liquidity message.
 5. Start a settlement: available liquidity moves into in-flight exposure until it settles or fails.
 6. Force delay or fail: delayed/failed settlement alerts appear and the dashboard shows the exposure window.
-7. Recover feed to `HEALTHY`: alerts resolve, circuit closes, liquidity exits conservative mode.
+7. Recover feed to Healthy: alerts resolve, circuit closes, liquidity exits conservative mode.
 
 See `docs/LOOM_SCRIPT.md` for a 3-5 minute recording script.
 
@@ -230,6 +230,10 @@ Response shape:
     available: number
     availableAdjusted?: number
     degradedAssets: string[]
+    pendingSettlementAmount: number
+    delayedSettlementAmount: number
+    oldestPendingSettlementAgeMs: number
+    settlementExposure: number
     confidence: string
   }
 }
@@ -276,6 +280,14 @@ If the backend build fails, the frontend build does not run.
 
 This is intentional: the shared contracts and backend behavior are foundational. If they are broken, validating the frontend bundle is lower signal. A production CI could split backend and frontend into parallel jobs, but the current workflow keeps the assessment CI simple, deterministic, and easy to read.
 
+## Deployment Wiring
+
+Deploy wiring is documented in `docs/DEPLOYMENT.md`.
+
+The intended path uses the existing EC2 instance for the NestJS backend and the existing S3/CloudFront setup for the Vite frontend. The project does not commit secrets, does not create new infrastructure during deploy, and does not require Terraform changes for the current assessment flow.
+
+The backend exposes `GET /health/metrics` for post-deploy verification.
+
 ## AI Pragmatism
 
 AI was used as an engineering accelerator, not as a runtime feature. It helped compare architecture alternatives, pressure-test scope, identify edge cases, and turn the challenge requirements into deterministic demo scenarios.
@@ -319,9 +331,7 @@ See `docs/BACKLOG.md` for the full friction-by-friction backlog and deferred pro
 These can be added without changing the core architecture:
 
 - GitHub Actions CI validation.
-- EC2 backend deploy wiring.
-- S3/CloudFront frontend deploy wiring.
-- CloudFront invalidation.
+- One-click deploy automation on top of the documented EC2/S3/CloudFront wiring.
 - Better source drill-down UI.
 - More detailed audit table.
 - Operator tooltips for `FRESH`, `STALE`, `ESTIMATED`, and circuit states.
