@@ -17,6 +17,7 @@ import { useStore } from './store'
 import { FeedHealthPanel } from './components/FeedHealthPanel'
 import { CircuitBreakerPanel } from './components/CircuitBreakerPanel'
 import { LiquidityPanel } from './components/LiquidityPanel'
+import { SettlementPanel } from './components/SettlementPanel'
 import { AlertFeed } from './components/AlertFeed'
 import { SimulatorControl } from './components/SimulatorControl'
 import { ThemeToggle } from './components/ThemeToggle'
@@ -178,6 +179,7 @@ function Dashboard() {
               <VStack align="stretch" gap={5}>
                 <FeedHealthPanel />
                 <LiquidityPanel />
+                <SettlementPanel />
                 <Box display={{ base: 'block', xl: 'none' }}>
                   <SimulatorControl />
                 </Box>

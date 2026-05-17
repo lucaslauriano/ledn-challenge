@@ -3,6 +3,7 @@ import type {
   PriceRecord,
   LiquiditySnapshot,
   AlertEvent,
+  SettlementSnapshot,
 } from '@ledn/shared'
 
 import {
@@ -33,6 +34,10 @@ interface AppStore {
   // Liquidity
   liquidity: LiquiditySnapshot | null
   setLiquidity: (liquidity: LiquiditySnapshot) => void
+
+  // Settlements
+  settlements: SettlementSnapshot | null
+  setSettlements: (settlements: SettlementSnapshot) => void
 
   // Alerts
   alerts: AlertEvent[]
@@ -65,6 +70,9 @@ export const useStore = create<AppStore>((set) => ({
 
   liquidity: null,
   setLiquidity: (liquidity) => set({ liquidity }),
+
+  settlements: null,
+  setSettlements: (settlements) => set({ settlements }),
 
   alerts: [],
   addAlert: (alert) =>

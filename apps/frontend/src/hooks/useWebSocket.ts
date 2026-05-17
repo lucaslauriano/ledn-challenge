@@ -8,6 +8,7 @@ import {
   type AlertEvent,
   type LiquiditySnapshot,
   type PriceRecord,
+  type SettlementSnapshot,
   type WsEvent,
 } from '@ledn/shared'
 import { useStore } from '../store'
@@ -26,6 +27,7 @@ export function useWebSocket() {
       setCircuitState,
       setFeedMode,
       setPrices,
+      setSettlements,
     } = useStore.getState()
 
     const socket = io(FRONTEND_ENV.wsUrl, { transports: ['websocket'] })
@@ -41,9 +43,11 @@ export function useWebSocket() {
             prices: Record<string, PriceRecord>
             liquidity: LiquiditySnapshot
             alerts: AlertEvent[]
+            settlements: SettlementSnapshot
           }
           setPrices(data.prices)
           setLiquidity(data.liquidity)
+          setSettlements(data.settlements)
           data.alerts.forEach(addAlert)
           break
         }
@@ -79,6 +83,10 @@ export function useWebSocket() {
             mode: FeedMode
           }
           setFeedMode(data.assetId, data.mode)
+          break
+        }
+        case WsEventType.SETTLEMENTS_UPDATED: {
+          setSettlements(event.payload as SettlementSnapshot)
           break
         }
       }
