@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import {
   AlertSeverity,
+  AlertType,
   SettlementScenario,
   SettlementStatus,
 } from '@ledn/shared'
@@ -14,6 +15,12 @@ import {
 } from '../../config/constants'
 import { AlertService } from '../alert/alert.service'
 import { LiquidityService } from '../liquidity/liquidity.service'
+
+const DELAYED_ALERT_TYPE: AlertType = SETTLEMENT_DELAYED_ALERT_TYPE
+const FAILED_ALERT_TYPE: AlertType = SETTLEMENT_FAILED_ALERT_TYPE
+const EXPOSURE_BREACH_ALERT_TYPE: AlertType =
+  SETTLEMENT_EXPOSURE_BREACH_ALERT_TYPE
+const SETTLEMENTS_UPDATED_SUBJECT: string = SETTLEMENTS_UPDATED_EVENT
 
 type SettlementOperationRecord = {
   id: string
@@ -110,11 +117,11 @@ export class SettlementService {
 
     await this.liquidityService.settleInFlight(operation.amount)
     await this.alertService.resolveByTypeAndResource(
-      SETTLEMENT_DELAYED_ALERT_TYPE,
+      DELAYED_ALERT_TYPE,
       operation.id,
     )
     await this.alertService.resolveByTypeAndResource(
-      SETTLEMENT_EXPOSURE_BREACH_ALERT_TYPE,
+      EXPOSURE_BREACH_ALERT_TYPE,
       operation.id,
     )
     await this.publishSnapshot()
@@ -130,7 +137,7 @@ export class SettlementService {
 
     await this.liquidityService.failSettlement(operation.amount)
     this.nats.publish('alert.trigger', {
-      type: SETTLEMENT_FAILED_ALERT_TYPE,
+      type: FAILED_ALERT_TYPE,
       severity: AlertSeverity.HIGH,
       assetId: operation.id,
       message: `Settlement ${operation.id} failed and funds were released back to available liquidity`,
@@ -184,7 +191,7 @@ export class SettlementService {
       oldestPendingSettlementAgeMs: snapshot.oldestPendingSettlementAgeMs,
       settlementExposure: snapshot.settlementExposure,
     })
-    this.nats.publish(SETTLEMENTS_UPDATED_EVENT, snapshot)
+    this.nats.publish(SETTLEMENTS_UPDATED_SUBJECT, snapshot)
   }
 
   private syncAlerts(snapshot: SettlementSnapshotRecord): void {
@@ -200,7 +207,7 @@ export class SettlementService {
 
       if (isDelayed) {
         this.nats.publish('alert.trigger', {
-          type: SETTLEMENT_DELAYED_ALERT_TYPE,
+          type: DELAYED_ALERT_TYPE,
           severity: AlertSeverity.HIGH,
           assetId: operation.id,
           message: `Settlement ${operation.id} is delayed`,
@@ -209,7 +216,7 @@ export class SettlementService {
 
       if (hasExposureBreach) {
         this.nats.publish('alert.trigger', {
-          type: SETTLEMENT_EXPOSURE_BREACH_ALERT_TYPE,
+          type: EXPOSURE_BREACH_ALERT_TYPE,
           severity: AlertSeverity.CRITICAL,
           assetId: operation.id,
           message: `Settlement ${operation.id} exposure window exceeded threshold`,
