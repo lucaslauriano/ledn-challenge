@@ -9,6 +9,12 @@ import {
 import { RedisService } from '../../common/redis/redis.service'
 import { NatsService } from '../../common/nats/nats.service'
 import { AlertService } from '../alert/alert.service'
+import {
+  APP_CONSTANTS,
+  CB_FAILURE_THRESHOLD_ENV,
+  CB_SUCCESS_THRESHOLD_ENV,
+  CB_TIMEOUT_MS_ENV,
+} from '../../config/constants'
 
 const KEYS = {
   state: (assetId: string) => `circuit:${assetId}:state`,
@@ -29,9 +35,18 @@ export class CircuitBreakerService implements OnModuleInit {
     private readonly nats: NatsService,
     private readonly alertService: AlertService,
   ) {
-    this.failureThreshold = this.config.get<number>('CB_FAILURE_THRESHOLD', 3)
-    this.successThreshold = this.config.get<number>('CB_SUCCESS_THRESHOLD', 2)
-    this.timeoutMs = this.config.get<number>('CB_TIMEOUT_MS', 5000)
+    this.failureThreshold = this.config.get<number>(
+      CB_FAILURE_THRESHOLD_ENV,
+      APP_CONSTANTS.circuitBreaker.failureThreshold,
+    )
+    this.successThreshold = this.config.get<number>(
+      CB_SUCCESS_THRESHOLD_ENV,
+      APP_CONSTANTS.circuitBreaker.successThreshold,
+    )
+    this.timeoutMs = this.config.get<number>(
+      CB_TIMEOUT_MS_ENV,
+      APP_CONSTANTS.circuitBreaker.timeoutMs,
+    )
   }
 
   onModuleInit() {

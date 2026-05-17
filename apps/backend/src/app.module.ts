@@ -10,6 +10,7 @@ import { AlertModule } from './modules/alert/alert.module'
 import { GatewayModule } from './modules/gateway/gateway.module'
 import { NatsModule } from 'src/common/nats/nats.module'
 import { HealthModule } from './modules/health/health.module'
+import { MONGODB_URI_ENV } from './config/constants'
 
 @Module({
   imports: [
@@ -20,7 +21,7 @@ import { HealthModule } from './modules/health/health.module'
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
-        uri: config.get<string>('MONGODB_URI'),
+        uri: config.get<string>(MONGODB_URI_ENV as string),
       }),
       inject: [ConfigService],
     }),

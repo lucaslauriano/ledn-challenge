@@ -89,7 +89,8 @@ describe('LiquidityService', () => {
     ).handlePriceConfidence(makePriceRecord(DataConfidence.ESTIMATED))
 
     const snapshot = service.getSnapshot()
-    const amountAboveAdjusted = (snapshot.availableAdjusted ?? snapshot.available) + 1
+    const amountAboveAdjusted =
+      (snapshot.availableAdjusted ?? snapshot.available) + 1
 
     await expect(service.lockFunds(amountAboveAdjusted)).rejects.toThrow(
       BadRequestException,

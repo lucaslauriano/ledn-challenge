@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common'
+import { CircuitState } from '@ledn/shared'
 import { APP_CONSTANTS } from '../../config/constants'
 import { AlertService } from '../alert/alert.service'
 import { CircuitBreakerService } from '../circuit-breaker/circuit-breaker.service'
@@ -44,12 +45,15 @@ export class HealthController {
     }
   }
 
-  private async getCircuitStates() {
+  private async getCircuitStates(): Promise<Record<string, CircuitState>> {
     const entries = await Promise.all(
-      APP_CONSTANTS.assets.map(async (assetId) => [
-        assetId,
-        await this.circuitBreaker.getState(assetId),
-      ]),
+      APP_CONSTANTS.assets.map(
+        async (assetId) =>
+          [assetId, await this.circuitBreaker.getState(assetId)] satisfies [
+            string,
+            CircuitState,
+          ],
+      ),
     )
 
     return Object.fromEntries(entries)

@@ -13,8 +13,7 @@ import {
 import type { LiquiditySnapshot } from '@ledn/shared'
 import { useLiquidity } from '../../hooks/useLiquidity'
 import { useStore } from '../../store'
-
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
+import { FRONTEND_ENV } from '../../config/env'
 
 type AuditEntry = {
   id: string
@@ -46,7 +45,7 @@ export function LiquidityPanel() {
 
   const loadAuditTrail = async () => {
     try {
-      const response = await fetch(`${API_URL}/liquidity/audit`)
+      const response = await fetch(`${FRONTEND_ENV.apiUrl}/liquidity/audit`)
       if (!response.ok) return
       setAuditTrail(await response.json())
     } catch {
@@ -55,7 +54,7 @@ export function LiquidityPanel() {
   }
 
   useEffect(() => {
-    void fetch(`${API_URL}/liquidity/audit`)
+    void fetch(`${FRONTEND_ENV.apiUrl}/liquidity/audit`)
       .then((response) => (response.ok ? response.json() : []))
       .then((entries: AuditEntry[]) => setAuditTrail(entries))
       .catch(() => setAuditTrail([]))
@@ -72,11 +71,14 @@ export function LiquidityPanel() {
     setMessage(null)
 
     try {
-      const response = await fetch(`${API_URL}/liquidity/${action}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: parsedAmount }),
-      })
+      const response = await fetch(
+        `${FRONTEND_ENV.apiUrl}/liquidity/${action}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: parsedAmount }),
+        },
+      )
       const data = await response.json()
 
       if (!response.ok) {
@@ -89,7 +91,10 @@ export function LiquidityPanel() {
       setAmount('')
       setMessage({
         tone: 'success',
-        text: `${action === 'lock' ? 'Locked' : 'Released'} ${formatCurrency(parsedAmount)}.`,
+        text:
+          action === 'lock'
+            ? `Locked ${formatCurrency(parsedAmount)}: available decreased, locked increased.`
+            : `Released ${formatCurrency(parsedAmount)}: locked decreased, available increased.`,
       })
     } catch {
       setMessage({
@@ -126,6 +131,9 @@ export function LiquidityPanel() {
     (liquidity.available / liquidity.total) * 100,
   )
   const availableAdjusted = liquidity.availableAdjusted ?? liquidity.available
+  const maxLockableAmount = liquidity.conservativeMode
+    ? availableAdjusted
+    : liquidity.available
   const degradedAssets = liquidity.degradedAssets ?? []
 
   return (
@@ -158,6 +166,20 @@ export function LiquidityPanel() {
         _dark={{ borderColor: '#262626' }}
       />
       <VStack align="stretch" gap={3}>
+        <Box
+          p={3}
+          borderWidth={1}
+          borderColor="#d7dce8"
+          _dark={{ borderColor: '#262626', bg: '#111111' }}
+          borderRadius="md"
+          bg="#f8fafc"
+        >
+          <Text fontSize="sm" color="#344054" _dark={{ color: '#d4d4d4' }}>
+            Lock moves funds from available to locked. Release moves locked funds
+            back to available.
+          </Text>
+        </Box>
+
         {liquidity.conservativeMode && (
           <Box p={3} borderWidth={1} borderRadius="md" borderColor="orange.300">
             <HStack justify="space-between" align="start">
@@ -166,7 +188,7 @@ export function LiquidityPanel() {
                   Pricing degraded — conservative liquidity mode
                 </Text>
                 <Text fontSize="xs" color="gray.500">
-                  Lock decisions use conservative available liquidity.
+                  Lock validation uses the adjusted max lockable amount below.
                 </Text>
               </VStack>
               <Badge colorPalette="orange">
@@ -194,26 +216,29 @@ export function LiquidityPanel() {
               {formatCurrency(liquidity.available)}
             </Text>
             <Text fontSize="xs" color="#667085" _dark={{ color: '#a3a3a3' }}>
-              {availablePercent}% utilization
+              {availablePercent}% of vault is immediately available
             </Text>
           </VStack>
         </HStack>
 
-        {liquidity.conservativeMode && (
-          <HStack justify="space-between">
-            <VStack align="start" gap={0}>
-              <Text fontSize="sm" color="gray.500">
-                Conservative available
-              </Text>
-              <Text fontSize="xs" color="gray.400">
-                Used for lock validation
-              </Text>
-            </VStack>
-            <Text fontWeight="bold" color="orange.500">
-              {formatCurrency(availableAdjusted)}
+        <HStack justify="space-between">
+          <VStack align="start" gap={0}>
+            <Text fontSize="sm" color="gray.500">
+              Max lockable amount
             </Text>
-          </HStack>
-        )}
+            <Text fontSize="xs" color="gray.400">
+              {liquidity.conservativeMode
+                ? 'Uses conservative available while pricing is degraded'
+                : 'Matches current available capital'}
+            </Text>
+          </VStack>
+          <Text
+            fontWeight="bold"
+            color={liquidity.conservativeMode ? 'orange.500' : '#087443'}
+          >
+            {formatCurrency(maxLockableAmount)}
+          </Text>
+        </HStack>
 
         <HStack gap={4} align="stretch">
           <Box
@@ -252,10 +277,13 @@ export function LiquidityPanel() {
               _dark={{ color: '#9bc2f5' }}
               textTransform="uppercase"
             >
-              In flight
+              In-flight settlement
             </Text>
             <Text fontWeight="800" fontFamily="mono">
               {formatCurrency(liquidity.inFlight)}
+            </Text>
+            <Text fontSize="xs" color="#667085" _dark={{ color: '#a3a3a3' }}>
+              Settlement rail simulation, not changed by lock/release
             </Text>
           </Box>
         </HStack>
@@ -291,11 +319,16 @@ export function LiquidityPanel() {
           <Heading size="xs" textTransform="uppercase" fontWeight="500">
             Asset lock/release protocol
           </Heading>
-          {liquidity.conservativeMode && (
-            <Text fontSize="xs" color="orange.500">
-              Max lock amount uses conservative available.
-            </Text>
-          )}
+          <Text fontSize="xs" color="#667085" _dark={{ color: '#a3a3a3' }}>
+            Lock decreases available capital and increases locked assets. Release
+            decreases locked assets and returns funds to available capital.
+          </Text>
+          <Text
+            fontSize="xs"
+            color={liquidity.conservativeMode ? 'orange.500' : 'gray.500'}
+          >
+            Current max lockable amount: {formatCurrency(maxLockableAmount)}
+          </Text>
           <HStack>
             <Input
               value={amount}

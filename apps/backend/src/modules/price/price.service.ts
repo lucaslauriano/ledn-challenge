@@ -16,7 +16,7 @@ import { CircuitBreakerService } from '../circuit-breaker/circuit-breaker.servic
 import { FeedService, PriceTick } from '../feed/feed.service'
 import { PriceRecord, PriceDocument } from './price.schema'
 import { NatsService } from '../../common/nats/nats.service'
-import { APP_CONSTANTS } from '../../config/constants'
+import { APP_CONSTANTS, STALE_THRESHOLD_MS_ENV } from '../../config/constants'
 import { AlertService } from '../alert/alert.service'
 
 const CACHE_TTL = 60
@@ -39,7 +39,7 @@ export class PriceService implements OnModuleInit {
     private readonly alertService: AlertService,
   ) {
     this.staleThresholdMs = this.config.get<number>(
-      'STALE_THRESHOLD_MS',
+      STALE_THRESHOLD_MS_ENV,
       APP_CONSTANTS.feed.staleThresholdMs,
     )
   }

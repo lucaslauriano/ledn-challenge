@@ -39,4 +39,17 @@ export const APP_CONSTANTS = {
   },
 } as const
 
+export const PORT_ENV = 'PORT'
+export const MONGODB_URI_ENV = 'MONGODB_URI'
+export const NATS_URL_ENV = 'NATS_URL'
+export const REDIS_HOST_ENV = 'REDIS_HOST'
+export const REDIS_PORT_ENV = 'REDIS_PORT'
+export const FEED_INTERVAL_MS_ENV = 'FEED_INTERVAL_MS'
+export const FEED_DELAYED_EVERY_NTH_TICK_ENV = 'FEED_DELAYED_EVERY_NTH_TICK'
+export const FEED_DRIFT_MULTIPLIER_ENV = 'FEED_DRIFT_MULTIPLIER'
+export const STALE_THRESHOLD_MS_ENV = 'STALE_THRESHOLD_MS'
+export const CB_FAILURE_THRESHOLD_ENV = 'CB_FAILURE_THRESHOLD'
+export const CB_SUCCESS_THRESHOLD_ENV = 'CB_SUCCESS_THRESHOLD'
+export const CB_TIMEOUT_MS_ENV = 'CB_TIMEOUT_MS'
+
 export type AssetId = (typeof APP_CONSTANTS.assets)[number]

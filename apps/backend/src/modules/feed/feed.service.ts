@@ -7,7 +7,12 @@ import {
 import { ConfigService } from '@nestjs/config'
 import { FeedMode, FeedScenario, WsEventType } from '@ledn/shared'
 import { NatsService } from '../../common/nats/nats.service'
-import { APP_CONSTANTS } from '../../config/constants'
+import {
+  APP_CONSTANTS,
+  FEED_DELAYED_EVERY_NTH_TICK_ENV,
+  FEED_DRIFT_MULTIPLIER_ENV,
+  FEED_INTERVAL_MS_ENV,
+} from '../../config/constants'
 import { FEED_SCENARIOS } from './scenarios'
 
 export interface PriceTick {
@@ -45,15 +50,15 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
     private readonly nats: NatsService,
   ) {
     this.intervalMs = this.config.get<number>(
-      'FEED_INTERVAL_MS',
+      FEED_INTERVAL_MS_ENV,
       APP_CONSTANTS.feed.intervalMs,
     )
     this.delayedEveryNthTick = this.config.get<number>(
-      'FEED_DELAYED_EVERY_NTH_TICK',
+      FEED_DELAYED_EVERY_NTH_TICK_ENV,
       APP_CONSTANTS.feed.delayedEveryNthTick,
     )
     this.driftMultiplier = this.config.get<number>(
-      'FEED_DRIFT_MULTIPLIER',
+      FEED_DRIFT_MULTIPLIER_ENV,
       APP_CONSTANTS.feed.driftMultiplier,
     )
   }
@@ -146,7 +151,10 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
     const sequence = this.sequenceByAsset[assetId]
 
     if (mode === FeedMode.OFFLINE) return null
-    if (mode === FeedMode.DELAYED && sequence % this.delayedEveryNthTick !== 0) {
+    if (
+      mode === FeedMode.DELAYED &&
+      sequence % this.delayedEveryNthTick !== 0
+    ) {
       return null
     }
 

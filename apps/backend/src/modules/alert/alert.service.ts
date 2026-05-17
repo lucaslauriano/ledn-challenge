@@ -1,12 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { Model } from 'mongoose'
-import {
-  AlertEvent,
-  AlertSeverity,
-  AlertType,
-  WsEventType,
-} from '@ledn/shared'
+import { AlertEvent, AlertSeverity, AlertType, WsEventType } from '@ledn/shared'
 import { AlertRecord, AlertDocument } from './alert.schema'
 import { NatsService } from '../../common/nats/nats.service'
 import { RedisService } from '../../common/redis/redis.service'
@@ -65,12 +60,13 @@ export class AlertService implements OnModuleInit {
       message,
       assetId,
     })
-    const wasStored = await this.redis.setIfNotExists(dedupKey, alert._id.toString())
+    const wasStored = await this.redis.setIfNotExists(
+      dedupKey,
+      alert._id.toString(),
+    )
     if (!wasStored) {
       const winnerId = await this.redis.get(dedupKey)
-      const winner = winnerId
-        ? await this.alertModel.findById(winnerId)
-        : null
+      const winner = winnerId ? await this.alertModel.findById(winnerId) : null
 
       await this.alertModel.findByIdAndDelete(alert._id)
 
@@ -96,7 +92,9 @@ export class AlertService implements OnModuleInit {
     )
 
     if (resolved) {
-      await this.redis.del(this.getDedupKey(resolved.type, resolved.assetId ?? 'system'))
+      await this.redis.del(
+        this.getDedupKey(resolved.type, resolved.assetId ?? 'system'),
+      )
       const event = this.toAlertEvent(resolved)
       this.logger.log(
         JSON.stringify({
@@ -132,7 +130,10 @@ export class AlertService implements OnModuleInit {
   }
 
   async findAll(): Promise<AlertEvent[]> {
-    const alerts = await this.alertModel.find().sort({ createdAt: -1 }).limit(100)
+    const alerts = await this.alertModel
+      .find()
+      .sort({ createdAt: -1 })
+      .limit(100)
     return alerts.map((alert) => this.toAlertEvent(alert))
   }
 

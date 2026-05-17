@@ -11,8 +11,7 @@ import {
   type WsEvent,
 } from '@ledn/shared'
 import { useStore } from '../store'
-
-const WS_URL = import.meta.env.VITE_WS_URL ?? 'http://localhost:3000'
+import { FRONTEND_ENV } from '../config/env'
 
 export function useWebSocket() {
   const socketRef = useRef<Socket | null>(null)
@@ -29,7 +28,7 @@ export function useWebSocket() {
       setPrices,
     } = useStore.getState()
 
-    const socket = io(WS_URL, { transports: ['websocket'] })
+    const socket = io(FRONTEND_ENV.wsUrl, { transports: ['websocket'] })
     socketRef.current = socket
 
     socket.on('connect', () => setConnected(true))

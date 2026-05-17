@@ -9,6 +9,7 @@ import { FeedService } from '../feed/feed.service'
 import { AlertType, DataConfidence, FeedMode, PriceSource } from '@ledn/shared'
 import { NatsService } from '../../common/nats/nats.service'
 import { AlertService } from '../alert/alert.service'
+import { STALE_THRESHOLD_MS_ENV } from '../../config/constants'
 
 const mockRedis = {
   get: jest.fn(),
@@ -33,7 +34,7 @@ const mockPriceModel = {
 
 const mockConfig = {
   get: jest.fn((key: string, defaultValue?: number) => {
-    if (key === 'STALE_THRESHOLD_MS') return 5000
+    if (key === STALE_THRESHOLD_MS_ENV) return 5000
     return defaultValue
   }),
 }

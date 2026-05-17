@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common'
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common'
 import {
   AlertSeverity,
   AlertType,
@@ -94,7 +99,8 @@ export class LiquidityService implements OnModuleInit {
     this.validateAmount(amount)
 
     this.snapshot = this.buildSnapshot()
-    const availableForLock = this.snapshot.availableAdjusted ?? this.snapshot.available
+    const availableForLock =
+      this.snapshot.availableAdjusted ?? this.snapshot.available
 
     if (amount > availableForLock) {
       if (this.snapshot.conservativeMode) {
@@ -293,7 +299,8 @@ export class LiquidityService implements OnModuleInit {
   }
 
   private async syncAlerts(snapshot: LiquiditySnapshot) {
-    const availableRatio = snapshot.total === 0 ? 0 : snapshot.available / snapshot.total
+    const availableRatio =
+      snapshot.total === 0 ? 0 : snapshot.available / snapshot.total
 
     if (availableRatio < this.lowAvailableRatio) {
       this.nats.publish('alert.trigger', {
