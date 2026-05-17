@@ -40,6 +40,11 @@ export class HealthController {
         available: liquidity.available,
         availableAdjusted: liquidity.availableAdjusted,
         degradedAssets: liquidity.degradedAssets ?? [],
+        pendingSettlementAmount: liquidity.pendingSettlementAmount ?? 0,
+        delayedSettlementAmount: liquidity.delayedSettlementAmount ?? 0,
+        oldestPendingSettlementAgeMs:
+          liquidity.oldestPendingSettlementAgeMs ?? 0,
+        settlementExposure: liquidity.settlementExposure ?? 0,
         confidence: liquidity.confidence,
       },
     }

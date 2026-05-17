@@ -6,5 +6,6 @@ export enum CircuitState {
 
 export * from './price.types'
 export * from './liquidity.types'
+export * from './settlement.types'
 export * from './alert.types'
 export * from './ws.events'

@@ -26,6 +26,10 @@ export interface LiquiditySnapshot {
   conservativeMode: boolean
   availableAdjusted?: number
   degradedAssets?: string[]
+  pendingSettlementAmount?: number
+  delayedSettlementAmount?: number
+  oldestPendingSettlementAgeMs?: number
+  settlementExposure?: number
   timestamp: number
   updatedAt: number
   schemaVersion: number

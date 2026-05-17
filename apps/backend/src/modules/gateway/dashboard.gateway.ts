@@ -20,6 +20,7 @@ import { LiquidityService } from '../liquidity/liquidity.service'
 import { AlertService } from '../alert/alert.service'
 import { FeedService } from '../feed/feed.service'
 import { NatsService } from '../../common/nats/nats.service'
+import { SettlementService } from '../settlement/settlement.service'
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -38,6 +39,7 @@ export class DashboardGateway
     private readonly liquidityService: LiquidityService,
     private readonly alertService: AlertService,
     private readonly feedService: FeedService,
+    private readonly settlementService: SettlementService,
     private readonly nats: NatsService,
   ) {}
 
@@ -84,6 +86,13 @@ export class DashboardGateway
       })
     })
 
+    this.nats.subscribe(WsEventType.SETTLEMENTS_UPDATED, (data: unknown) => {
+      this.emitEvent({
+        type: WsEventType.SETTLEMENTS_UPDATED,
+        payload: data,
+      })
+    })
+
     this.logger.log('Subscribed to all NATS subjects')
   }
 
@@ -107,15 +116,16 @@ export class DashboardGateway
   }
 
   private async sendInitialState(client: Socket) {
-    const [prices, liquidity, alerts] = await Promise.all([
+    const [prices, liquidity, alerts, settlements] = await Promise.all([
       this.priceService.getLatestPrices(),
       Promise.resolve(this.liquidityService.getSnapshot()),
       this.alertService.findActive(),
+      Promise.resolve(this.settlementService.getSnapshot()),
     ])
 
     client.emit(WS_EVENT_CHANNEL, {
       type: WsEventType.INITIAL_STATE,
-      payload: { prices, liquidity, alerts },
+      payload: { prices, liquidity, alerts, settlements },
     } satisfies WsEvent)
   }
 

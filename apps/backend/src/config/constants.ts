@@ -1,3 +1,5 @@
+import { AlertType } from '@ledn/shared'
+
 export const APP_CONSTANTS = {
   assets: ['BTC', 'ETH'] as const,
   schemaVersion: 1,
@@ -37,6 +39,11 @@ export const APP_CONSTANTS = {
   scenarios: {
     stepDelayMs: 5000,
   },
+  settlement: {
+    normalSettlementDelayMs: 3000,
+    delayedSettlementDelayMs: 12000,
+    exposureBreachThresholdMs: 8000,
+  },
 } as const
 
 export const PORT_ENV = 'PORT'
@@ -51,5 +58,13 @@ export const STALE_THRESHOLD_MS_ENV = 'STALE_THRESHOLD_MS'
 export const CB_FAILURE_THRESHOLD_ENV = 'CB_FAILURE_THRESHOLD'
 export const CB_SUCCESS_THRESHOLD_ENV = 'CB_SUCCESS_THRESHOLD'
 export const CB_TIMEOUT_MS_ENV = 'CB_TIMEOUT_MS'
+
+export const SETTLEMENT_DELAYED_ALERT_TYPE: AlertType =
+  'SETTLEMENT_DELAYED' as AlertType
+export const SETTLEMENT_FAILED_ALERT_TYPE: AlertType =
+  'SETTLEMENT_FAILED' as AlertType
+export const SETTLEMENT_EXPOSURE_BREACH_ALERT_TYPE: AlertType =
+  'SETTLEMENT_EXPOSURE_BREACH' as AlertType
+export const SETTLEMENTS_UPDATED_EVENT = 'SETTLEMENTS_UPDATED'
 
 export type AssetId = (typeof APP_CONSTANTS.assets)[number]

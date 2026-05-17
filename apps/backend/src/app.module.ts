@@ -11,6 +11,7 @@ import { GatewayModule } from './modules/gateway/gateway.module'
 import { NatsModule } from 'src/common/nats/nats.module'
 import { HealthModule } from './modules/health/health.module'
 import { MONGODB_URI_ENV } from './config/constants'
+import { SettlementModule } from './modules/settlement/settlement.module'
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { MONGODB_URI_ENV } from './config/constants'
     PriceModule,
     LiquidityModule,
     AlertModule,
+    SettlementModule,
     GatewayModule,
     HealthModule,
   ],

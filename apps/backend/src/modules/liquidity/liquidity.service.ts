@@ -29,10 +29,22 @@ interface SourceRuntimeState {
 
 export interface AuditEntry {
   id: string
-  type: 'LOCK' | 'RELEASE'
+  type:
+    | 'LOCK'
+    | 'RELEASE'
+    | 'SETTLEMENT_START'
+    | 'SETTLEMENT_SETTLE'
+    | 'SETTLEMENT_FAIL'
   amount: number
   operatorId: string
   timestamp: number
+}
+
+export interface SettlementLiquidityMetrics {
+  pendingSettlementAmount: number
+  delayedSettlementAmount: number
+  oldestPendingSettlementAgeMs: number
+  settlementExposure: number
 }
 
 @Injectable()
@@ -47,6 +59,12 @@ export class LiquidityService implements OnModuleInit {
   private auditTrail: AuditEntry[] = []
   private readonly degradedAssets = new Set<string>()
   private lastConservativeMode = false
+  private settlementMetrics: SettlementLiquidityMetrics = {
+    pendingSettlementAmount: 0,
+    delayedSettlementAmount: 0,
+    oldestPendingSettlementAgeMs: 0,
+    settlementExposure: 0,
+  }
 
   private readonly sources: Record<string, SourceRuntimeState> = {
     [APP_CONSTANTS.liquidity.sources.internalLedger.sourceId]: {
@@ -166,6 +184,67 @@ export class LiquidityService implements OnModuleInit {
     return this.snapshot
   }
 
+  async startSettlement(amount: number) {
+    this.validateAmount(amount)
+
+    this.snapshot = this.buildSnapshot()
+    const availableForSettlement =
+      this.snapshot.availableAdjusted ?? this.snapshot.available
+
+    if (amount > availableForSettlement) {
+      throw new BadRequestException(
+        'Insufficient available funds for settlement',
+      )
+    }
+
+    this.sources['internal-ledger'].amount -= amount
+    this.sources['settlement-rail'].amount += amount
+    this.touchSource('internal-ledger')
+    this.touchSource('settlement-rail')
+    this.recordAudit('SETTLEMENT_START', amount)
+
+    await this.refreshSnapshot()
+    return this.snapshot
+  }
+
+  async settleInFlight(amount: number) {
+    this.validateAmount(amount)
+
+    if (amount > this.sources['settlement-rail'].amount) {
+      throw new BadRequestException('Insufficient in-flight funds')
+    }
+
+    this.sources['settlement-rail'].amount -= amount
+    this.touchSource('settlement-rail')
+    this.recordAudit('SETTLEMENT_SETTLE', amount)
+
+    await this.refreshSnapshot()
+    return this.snapshot
+  }
+
+  async failSettlement(amount: number) {
+    this.validateAmount(amount)
+
+    if (amount > this.sources['settlement-rail'].amount) {
+      throw new BadRequestException('Insufficient in-flight funds')
+    }
+
+    this.sources['settlement-rail'].amount -= amount
+    this.sources['internal-ledger'].amount += amount
+    this.touchSource('settlement-rail')
+    this.touchSource('internal-ledger')
+    this.recordAudit('SETTLEMENT_FAIL', amount)
+
+    await this.refreshSnapshot()
+    return this.snapshot
+  }
+
+  async updateSettlementMetrics(metrics: SettlementLiquidityMetrics) {
+    this.setSettlementMetrics(metrics)
+    await this.refreshSnapshot()
+    return this.snapshot
+  }
+
   private async refreshSnapshot() {
     const nextSnapshot = this.buildSnapshot()
     this.logConservativeModeTransition(nextSnapshot)
@@ -201,6 +280,11 @@ export class LiquidityService implements OnModuleInit {
       conservativeMode: policy.conservativeMode,
       availableAdjusted: policy.availableAdjusted,
       degradedAssets,
+      pendingSettlementAmount: this.settlementMetrics.pendingSettlementAmount,
+      delayedSettlementAmount: this.settlementMetrics.delayedSettlementAmount,
+      oldestPendingSettlementAgeMs:
+        this.settlementMetrics.oldestPendingSettlementAgeMs,
+      settlementExposure: this.settlementMetrics.settlementExposure,
       timestamp: now,
       updatedAt: Math.max(...sources.map((source) => source.updatedAt)),
       schemaVersion: APP_CONSTANTS.schemaVersion,
@@ -267,6 +351,22 @@ export class LiquidityService implements OnModuleInit {
   private validateAmount(amount: number) {
     if (!Number.isFinite(amount) || amount <= 0) {
       throw new BadRequestException('Amount must be a positive number')
+    }
+  }
+
+  private setSettlementMetrics(metrics: SettlementLiquidityMetrics) {
+    this.settlementMetrics = {
+      pendingSettlementAmount: parseFloat(
+        metrics.pendingSettlementAmount.toFixed(2),
+      ),
+      delayedSettlementAmount: parseFloat(
+        metrics.delayedSettlementAmount.toFixed(2),
+      ),
+      oldestPendingSettlementAgeMs: Math.max(
+        0,
+        Math.round(metrics.oldestPendingSettlementAgeMs),
+      ),
+      settlementExposure: parseFloat(metrics.settlementExposure.toFixed(2)),
     }
   }
 
