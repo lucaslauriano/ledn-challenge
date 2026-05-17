@@ -18,6 +18,10 @@ import {
 } from '@ledn/shared'
 import { FRONTEND_ENV } from '../../config/env'
 import { useStore } from '../../store'
+import {
+  getSettlementScenarioLabel,
+  getSettlementStatusLabel,
+} from '../../utils/status-labels'
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('en-US', {
@@ -277,7 +281,7 @@ function SettlementRow({ operation }: { operation: SettlementOperation }) {
             px={2}
             py={1}
           >
-            {operation.status}
+            {getSettlementStatusLabel(operation.status)}
           </Badge>
           <Text fontSize="sm">{formatCurrency(operation.amount)}</Text>
         </HStack>
@@ -286,7 +290,7 @@ function SettlementRow({ operation }: { operation: SettlementOperation }) {
         </Text>
       </VStack>
       <Text fontSize="xs" color="gray.400">
-        {operation.scenario}
+        {getSettlementScenarioLabel(operation.scenario)}
       </Text>
     </HStack>
   )

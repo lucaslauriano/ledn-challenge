@@ -61,7 +61,7 @@ function Dashboard() {
             colorPalette={connected ? 'green' : 'red'}
             variant="subtle"
           >
-            {connected ? 'LIVE' : 'DISCONNECTED'}
+            {connected ? 'Live' : 'Disconnected'}
           </Badge>
           <Text fontSize="sm" fontFamily="mono">
             {new Date().toLocaleTimeString()}

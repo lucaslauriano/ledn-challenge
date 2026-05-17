@@ -14,10 +14,19 @@ import type { LiquiditySnapshot } from '@ledn/shared'
 import { useLiquidity } from '../../hooks/useLiquidity'
 import { useStore } from '../../store'
 import { FRONTEND_ENV } from '../../config/env'
+import {
+  getAuditEntryLabel,
+  getLiquidityConfidenceLabel,
+} from '../../utils/status-labels'
 
 type AuditEntry = {
   id: string
-  type: 'LOCK' | 'RELEASE'
+  type:
+    | 'LOCK'
+    | 'RELEASE'
+    | 'SETTLEMENT_START'
+    | 'SETTLEMENT_SETTLE'
+    | 'SETTLEMENT_FAIL'
   amount: number
   operatorId: string
   timestamp: number
@@ -34,6 +43,12 @@ const formatCurrency = (value: number) =>
     currency: 'USD',
     maximumFractionDigits: 0,
   }).format(value)
+
+const auditEntryColor = (type: AuditEntry['type']) => {
+  if (type === 'LOCK' || type === 'SETTLEMENT_START') return 'orange'
+  if (type === 'SETTLEMENT_FAIL') return 'red'
+  return 'green'
+}
 
 export function LiquidityPanel() {
   const liquidity = useLiquidity()
@@ -194,7 +209,7 @@ export function LiquidityPanel() {
               <Badge colorPalette="orange">
                 {degradedAssets.length > 0
                   ? degradedAssets.join(', ')
-                  : 'DEGRADED'}
+                  : 'Degraded'}
               </Badge>
             </HStack>
           </Box>
@@ -300,7 +315,7 @@ export function LiquidityPanel() {
             py={1}
             borderRadius="md"
           >
-            {liquidity.confidence}
+            {getLiquidityConfidenceLabel(liquidity.confidence)}
           </Badge>
         </HStack>
 
@@ -394,11 +409,11 @@ export function LiquidityPanel() {
                 <HStack key={entry.id} justify="space-between">
                   <HStack>
                     <Badge
-                      colorPalette={entry.type === 'LOCK' ? 'orange' : 'green'}
+                      colorPalette={auditEntryColor(entry.type)}
                       px={2}
                       py={1}
                     >
-                      {entry.type}
+                      {getAuditEntryLabel(entry.type)}
                     </Badge>
                     <Text fontSize="sm">{formatCurrency(entry.amount)}</Text>
                   </HStack>

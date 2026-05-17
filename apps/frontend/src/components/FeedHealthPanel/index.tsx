@@ -1,6 +1,12 @@
 import { Box, Badge, Text, VStack, HStack, Heading } from '@chakra-ui/react'
 import { CircuitState, DataConfidence, FeedMode } from '@ledn/shared'
 import { usePrices, useFeedModes, useCircuitStates } from '../../hooks/usePrices'
+import {
+  getCircuitStateLabel,
+  getDataConfidenceLabel,
+  getFeedModeLabel,
+  getPriceSourceLabel,
+} from '../../utils/status-labels'
 
 type RenderablePrice = {
   value?: number
@@ -96,10 +102,10 @@ export function FeedHealthPanel() {
                 </Text>
                 <HStack gap={2}>
                   <Badge colorPalette={modeColor(mode)} borderRadius="full" px={2} py={1}>
-                    {mode}
+                    {getFeedModeLabel(mode)}
                   </Badge>
                   <Badge colorPalette={circuitColor(circuitState)} borderRadius="full" px={2} py={1}>
-                    CB {circuitState}
+                    CB {getCircuitStateLabel(circuitState)}
                   </Badge>
                 </HStack>
               </HStack>
@@ -113,12 +119,13 @@ export function FeedHealthPanel() {
                     color={`${confidenceColor(price.confidence)}.600`}
                     fontWeight="800"
                   >
-                    {price.confidence}
+                    {getDataConfidenceLabel(price.confidence)}
                   </Text>
                 )}
                 {price && (
                     <Text fontSize="sm" color="#667085" _dark={{ color: '#a3a3a3' }}>
-                    Latency: {price.ageMs ?? '—'}ms · {price.source ?? 'UNKNOWN'}
+                    Latency: {price.ageMs ?? '—'}ms ·{' '}
+                    {price.source ? getPriceSourceLabel(price.source) : 'Unknown'}
                   </Text>
                 )}
               </HStack>

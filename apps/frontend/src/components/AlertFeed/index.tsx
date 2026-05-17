@@ -9,6 +9,10 @@ import {
 } from '@chakra-ui/react'
 import { AlertSeverity } from '@ledn/shared'
 import { useActiveAlerts } from '../../hooks/useAlerts'
+import {
+  getAlertSeverityLabel,
+  getAlertTypeLabel,
+} from '../../utils/status-labels'
 
 const severityColor = (severity: AlertSeverity) => {
   switch (severity) {
@@ -53,7 +57,7 @@ export function AlertFeed() {
       ) : (
         <VStack align="stretch" gap={2} p={4}>
           {alerts.slice(0, 10).map((alert) => {
-            const message = alert.payload?.message ?? alert.type
+            const message = alert.payload?.message ?? getAlertTypeLabel(alert.type)
 
             return (
               <Box
@@ -67,7 +71,7 @@ export function AlertFeed() {
               >
                 <HStack justify="space-between" mb={1}>
                   <Badge colorPalette={severityColor(alert.severity)} size="sm" px={2} py={1}>
-                    {alert.severity}
+                    {getAlertSeverityLabel(alert.severity)}
                   </Badge>
                   <Text fontSize="xs" color="gray.400">
                     {new Date(alert.createdAt).toLocaleTimeString()}

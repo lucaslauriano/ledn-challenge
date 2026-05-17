@@ -1,6 +1,7 @@
 import { Box, Badge, Text, VStack, HStack, Heading, Separator } from '@chakra-ui/react'
 import { CircuitState } from '@ledn/shared'
 import { useCircuitStates } from '../../hooks/usePrices'
+import { getCircuitStateLabel } from '../../utils/status-labels'
 
 const stateColor = (state: CircuitState) => {
   switch (state) {
@@ -57,7 +58,7 @@ export function CircuitBreakerPanel() {
                 </Text>
               </Box>
               <Badge colorPalette={stateColor(state)} px={3} py={2} borderRadius="md" fontSize="sm">
-                {state}
+                {getCircuitStateLabel(state)}
               </Badge>
             </HStack>
           )
