@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { connect, NatsConnection, JSONCodec, Subscription } from 'nats'
+import { NATS_URL_ENV } from '../../config/constants'
 
 @Injectable()
 export class NatsService implements OnModuleInit, OnModuleDestroy {
@@ -16,7 +17,10 @@ export class NatsService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly config: ConfigService) {}
 
   async onModuleInit() {
-    const url = this.config.get<string>('NATS_URL', 'nats://localhost:4222')
+    const url = this.config.get<string>(
+      NATS_URL_ENV as string,
+      'nats://localhost:4222',
+    )
     this.connection = await connect({ servers: url })
     this.logger.log(`Connected to NATS at ${url}`)
   }

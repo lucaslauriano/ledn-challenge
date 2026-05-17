@@ -2,13 +2,20 @@ import { create } from 'zustand'
 import type {
   PriceRecord,
   LiquiditySnapshot,
-  Alert,
+  AlertEvent,
+  SettlementSnapshot,
 } from '@ledn/shared'
 
 import {
   CircuitState,
   FeedMode,
+  FeedScenario,
 } from '@ledn/shared'
+
+type ActiveSimulation = {
+  scenario: FeedScenario
+  label: string
+}
 
 interface AppStore {
   // Prices
@@ -28,14 +35,23 @@ interface AppStore {
   liquidity: LiquiditySnapshot | null
   setLiquidity: (liquidity: LiquiditySnapshot) => void
 
+  // Settlements
+  settlements: SettlementSnapshot | null
+  setSettlements: (settlements: SettlementSnapshot) => void
+
   // Alerts
-  alerts: Alert[]
-  addAlert: (alert: Alert) => void
+  alerts: AlertEvent[]
+  addAlert: (alert: AlertEvent) => void
   resolveAlert: (id: string) => void
 
   // Connection
   connected: boolean
   setConnected: (connected: boolean) => void
+
+  // Simulation
+  activeSimulation: ActiveSimulation | null
+  setActiveSimulation: (simulation: ActiveSimulation) => void
+  clearActiveSimulation: () => void
 }
 
 export const useStore = create<AppStore>((set) => ({
@@ -55,16 +71,28 @@ export const useStore = create<AppStore>((set) => ({
   liquidity: null,
   setLiquidity: (liquidity) => set({ liquidity }),
 
+  settlements: null,
+  setSettlements: (settlements) => set({ settlements }),
+
   alerts: [],
   addAlert: (alert) =>
-    set((s) => ({ alerts: [alert, ...s.alerts].slice(0, 50) })),
+    set((s) => ({
+      alerts: [alert, ...s.alerts.filter((item) => item.id !== alert.id)].slice(
+        0,
+        50,
+      ),
+    })),
   resolveAlert: (id) =>
     set((s) => ({
       alerts: s.alerts.map((a) =>
-        a.id === id ? { ...a, resolved: true } : a,
+        a.id === id ? { ...a, isActive: false, resolvedAt: Date.now() } : a,
       ),
     })),
 
   connected: false,
   setConnected: (connected) => set({ connected }),
+
+  activeSimulation: null,
+  setActiveSimulation: (simulation) => set({ activeSimulation: simulation }),
+  clearActiveSimulation: () => set({ activeSimulation: null }),
 }))

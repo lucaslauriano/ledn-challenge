@@ -1,28 +1,31 @@
-import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
-import { AlertType, AlertSeverity } from '@ledn/shared';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
+import { Document } from 'mongoose'
+import { AlertType, AlertSeverity } from '@ledn/shared'
 
-export type AlertDocument = AlertRecord & Document;
+export type AlertDocument = AlertRecord & Document
 
 @Schema({ timestamps: true })
 export class AlertRecord {
-  @Prop({ enum: AlertType, required: true })
-  type: AlertType;
+  @Prop({ type: String, enum: AlertType, required: true })
+  type: AlertType
 
-  @Prop({ enum: AlertSeverity, required: true })
-  severity: AlertSeverity;
+  @Prop({ type: String, enum: AlertSeverity, required: true })
+  severity: AlertSeverity
 
   @Prop()
-  assetId?: string;
+  assetId?: string
 
   @Prop({ required: true })
-  message: string;
+  message: string
+
+  @Prop({ default: () => new Date() })
+  timestamp: Date
 
   @Prop({ default: false })
-  resolved: boolean;
+  resolved: boolean
 
   @Prop()
-  resolvedAt?: Date;
+  resolvedAt?: Date
 }
 
-export const AlertSchema = SchemaFactory.createForClass(AlertRecord);
+export const AlertSchema = SchemaFactory.createForClass(AlertRecord)

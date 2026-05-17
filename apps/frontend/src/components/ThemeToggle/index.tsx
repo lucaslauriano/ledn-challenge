@@ -1,21 +1,19 @@
 import { Button } from '@chakra-ui/react'
-import { useState } from 'react'
+import { useColorMode } from '../ui/use-color-mode'
 
 export function ThemeToggle() {
-  const [isDark, setIsDark] = useState(false)
-
-  const toggle = () => {
-    const next = !isDark
-    setIsDark(next)
-    document.documentElement.setAttribute(
-      'data-theme',
-      next ? 'dark' : 'light'
-    )
-  }
+  const { colorMode, toggleColorMode } = useColorMode()
 
   return (
-    <Button px={2} size="sm" variant="outline" onClick={toggle}>
-      {isDark ? '☀️ Light' : '🌙 Dark'}
+    <Button
+      size="xs"
+      px={3}
+      variant="outline"
+      borderColor="#d7dce8"
+      _dark={{ borderColor: '#404040', color: '#fafafa', _hover: { bg: '#171717' } }}
+      onClick={toggleColorMode}
+    >
+      {colorMode === 'dark' ? 'Dark' : 'Light'}
     </Button>
   )
 }

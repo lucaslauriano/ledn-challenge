@@ -15,14 +15,12 @@
     "outDir": "./dist",
     "baseUrl": "./",
     "incremental": true,
+    "tsBuildInfoFile": "./node_modules/.cache/backend.tsbuildinfo",
     "skipLibCheck": true,
     "strictNullChecks": true,
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": false,
     "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false,
-    "paths": {
-      "@ledn/shared": ["../../packages/shared/dist/index.d.ts"]
-    },
-  },
+    "noFallthroughCasesInSwitch": false
+  }
 }
