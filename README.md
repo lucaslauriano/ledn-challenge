@@ -256,6 +256,26 @@ Run:
 npm run test --workspace apps/backend -- --runInBand
 ```
 
+## CI Behavior
+
+The GitHub Actions workflow is intentionally linear and acts as a quality gate.
+
+It runs:
+
+1. `npm ci`
+2. `npm run build --workspace @ledn/shared`
+3. `npm run test --workspace apps/backend -- --runInBand`
+4. `npm run build --workspace apps/backend`
+5. `npm run build --workspace apps/frontend`
+
+If the shared package build fails, the backend and frontend checks do not run.
+
+If backend tests fail, the job stops before backend and frontend builds.
+
+If the backend build fails, the frontend build does not run.
+
+This is intentional: the shared contracts and backend behavior are foundational. If they are broken, validating the frontend bundle is lower signal. A production CI could split backend and frontend into parallel jobs, but the current workflow keeps the assessment CI simple, deterministic, and easy to read.
+
 ## AI Pragmatism
 
 AI was used as an engineering accelerator, not as a runtime feature. It helped compare architecture alternatives, pressure-test scope, identify edge cases, and turn the challenge requirements into deterministic demo scenarios.
