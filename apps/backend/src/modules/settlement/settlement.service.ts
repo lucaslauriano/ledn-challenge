@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common'
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common'
 import {
   AlertSeverity,
   AlertType,
@@ -48,7 +53,7 @@ type SettlementSnapshotRecord = {
 }
 
 @Injectable()
-export class SettlementService {
+export class SettlementService implements OnModuleInit {
   private readonly logger = new Logger(SettlementService.name)
   private operations: SettlementOperationRecord[] = []
   private sequence = 0
@@ -58,6 +63,10 @@ export class SettlementService {
     private readonly alertService: AlertService,
     private readonly nats: NatsService,
   ) {}
+
+  onModuleInit() {
+    void this.pruneOrphanedSettlementAlerts()
+  }
 
   getSnapshot(): SettlementSnapshotRecord {
     return this.buildSnapshot()
@@ -116,14 +125,7 @@ export class SettlementService {
     operation.exposureWindowMs = operation.settledAt - operation.submittedAt!
 
     await this.liquidityService.settleInFlight(operation.amount)
-    await this.alertService.resolveByTypeAndResource(
-      DELAYED_ALERT_TYPE,
-      operation.id,
-    )
-    await this.alertService.resolveByTypeAndResource(
-      EXPOSURE_BREACH_ALERT_TYPE,
-      operation.id,
-    )
+    await this.resolveSettlementAlerts(operation.id)
     await this.publishSnapshot()
     return this.getSnapshot()
   }
@@ -136,6 +138,7 @@ export class SettlementService {
     operation.exposureWindowMs = operation.failedAt - operation.submittedAt!
 
     await this.liquidityService.failSettlement(operation.amount)
+    await this.resolveSettlementAlerts(operation.id)
     this.nats.publish('alert.trigger', {
       type: FAILED_ALERT_TYPE,
       severity: AlertSeverity.HIGH,
@@ -184,7 +187,7 @@ export class SettlementService {
 
   private async publishSnapshot(): Promise<void> {
     const snapshot = this.buildSnapshot()
-    this.syncAlerts(snapshot)
+    await this.syncAlerts(snapshot)
     await this.liquidityService.updateSettlementMetrics({
       pendingSettlementAmount: snapshot.pendingSettlementAmount,
       delayedSettlementAmount: snapshot.delayedSettlementAmount,
@@ -194,9 +197,12 @@ export class SettlementService {
     this.nats.publish(SETTLEMENTS_UPDATED_SUBJECT, snapshot)
   }
 
-  private syncAlerts(snapshot: SettlementSnapshotRecord): void {
+  private async syncAlerts(snapshot: SettlementSnapshotRecord): Promise<void> {
     for (const operation of snapshot.operations) {
-      if (operation.status !== SettlementStatus.PENDING_SETTLEMENT) continue
+      if (operation.status !== SettlementStatus.PENDING_SETTLEMENT) {
+        await this.resolveSettlementAlerts(operation.id)
+        continue
+      }
 
       const isDelayed =
         operation.expectedSettlementAt !== undefined &&
@@ -212,6 +218,11 @@ export class SettlementService {
           assetId: operation.id,
           message: `Settlement ${operation.id} is delayed`,
         })
+      } else {
+        await this.alertService.resolveAllByTypeAndResource(
+          DELAYED_ALERT_TYPE,
+          operation.id,
+        )
       }
 
       if (hasExposureBreach) {
@@ -221,8 +232,53 @@ export class SettlementService {
           assetId: operation.id,
           message: `Settlement ${operation.id} exposure window exceeded threshold`,
         })
+      } else {
+        await this.alertService.resolveAllByTypeAndResource(
+          EXPOSURE_BREACH_ALERT_TYPE,
+          operation.id,
+        )
       }
     }
+  }
+
+  private async resolveSettlementAlerts(operationId: string): Promise<void> {
+    await Promise.all([
+      this.alertService.resolveAllByTypeAndResource(
+        DELAYED_ALERT_TYPE,
+        operationId,
+      ),
+      this.alertService.resolveAllByTypeAndResource(
+        EXPOSURE_BREACH_ALERT_TYPE,
+        operationId,
+      ),
+      this.alertService.resolveAllByTypeAndResource(
+        FAILED_ALERT_TYPE,
+        operationId,
+      ),
+    ])
+  }
+
+  private async pruneOrphanedSettlementAlerts(): Promise<void> {
+    const activePendingIds = new Set(
+      this.operations
+        .filter(
+          (operation) =>
+            operation.status === SettlementStatus.PENDING_SETTLEMENT,
+        )
+        .map((operation) => operation.id),
+    )
+
+    const staleAlerts = await this.alertService.findActiveByTypes([
+      DELAYED_ALERT_TYPE,
+      FAILED_ALERT_TYPE,
+      EXPOSURE_BREACH_ALERT_TYPE,
+    ])
+
+    await Promise.all(
+      staleAlerts
+        .filter((alert) => !activePendingIds.has(alert.resourceId))
+        .map((alert) => this.alertService.resolve(alert.id)),
+    )
   }
 
   private withExposureWindow(

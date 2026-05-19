@@ -22,9 +22,12 @@ export function useWebSocket() {
       setConnected,
       updatePrice,
       setLiquidity,
+      setAlerts,
       addAlert,
       resolveAlert,
+      setCircuitStates,
       setCircuitState,
+      setFeedModes,
       setFeedMode,
       setPrices,
       setSettlements,
@@ -44,11 +47,19 @@ export function useWebSocket() {
             liquidity: LiquiditySnapshot
             alerts: AlertEvent[]
             settlements: SettlementSnapshot
+            circuitStates?: Record<string, CircuitState>
+            feedModes?: Record<string, FeedMode>
           }
           setPrices(data.prices)
           setLiquidity(data.liquidity)
           setSettlements(data.settlements)
-          data.alerts.forEach(addAlert)
+          setAlerts(data.alerts)
+          if (data.circuitStates) {
+            setCircuitStates(data.circuitStates)
+          }
+          if (data.feedModes) {
+            setFeedModes(data.feedModes)
+          }
           break
         }
         case WsEventType.PRICE_UPDATED: {

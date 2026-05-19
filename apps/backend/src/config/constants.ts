@@ -6,6 +6,7 @@ export const APP_CONSTANTS = {
   feed: {
     intervalMs: 1000,
     delayedEveryNthTick: 5,
+    delayedDeliveryLagMs: 3000,
     staleThresholdMs: 5000,
     driftMultiplier: 1.06,
   },
@@ -53,6 +54,7 @@ export const REDIS_HOST_ENV = 'REDIS_HOST'
 export const REDIS_PORT_ENV = 'REDIS_PORT'
 export const FEED_INTERVAL_MS_ENV = 'FEED_INTERVAL_MS'
 export const FEED_DELAYED_EVERY_NTH_TICK_ENV = 'FEED_DELAYED_EVERY_NTH_TICK'
+export const FEED_DELAYED_DELIVERY_LAG_MS_ENV = 'FEED_DELAYED_DELIVERY_LAG_MS'
 export const FEED_DRIFT_MULTIPLIER_ENV = 'FEED_DRIFT_MULTIPLIER'
 export const STALE_THRESHOLD_MS_ENV = 'STALE_THRESHOLD_MS'
 export const CB_FAILURE_THRESHOLD_ENV = 'CB_FAILURE_THRESHOLD'

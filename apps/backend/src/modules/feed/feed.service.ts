@@ -9,6 +9,7 @@ import { FeedMode, FeedScenario, WsEventType } from '@ledn/shared'
 import { NatsService } from '../../common/nats/nats.service'
 import {
   APP_CONSTANTS,
+  FEED_DELAYED_DELIVERY_LAG_MS_ENV,
   FEED_DELAYED_EVERY_NTH_TICK_ENV,
   FEED_DRIFT_MULTIPLIER_ENV,
   FEED_INTERVAL_MS_ENV,
@@ -43,6 +44,7 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
     ETH: 0,
   }
   private readonly delayedEveryNthTick: number
+  private readonly delayedDeliveryLagMs: number
   private readonly driftMultiplier: number
 
   constructor(
@@ -56,6 +58,10 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
     this.delayedEveryNthTick = this.config.get<number>(
       FEED_DELAYED_EVERY_NTH_TICK_ENV,
       APP_CONSTANTS.feed.delayedEveryNthTick,
+    )
+    this.delayedDeliveryLagMs = this.config.get<number>(
+      FEED_DELAYED_DELIVERY_LAG_MS_ENV,
+      APP_CONSTANTS.feed.delayedDeliveryLagMs,
     )
     this.driftMultiplier = this.config.get<number>(
       FEED_DRIFT_MULTIPLIER_ENV,
@@ -166,10 +172,16 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
         ? healthyPrice * this.driftMultiplier
         : healthyPrice
 
+    const receivedAt = Date.now()
+    const publishedAt =
+      mode === FeedMode.DELAYED
+        ? receivedAt - this.delayedDeliveryLagMs
+        : receivedAt
+
     return {
       assetId,
       price: parseFloat(price.toFixed(2)),
-      timestamp: new Date(),
+      timestamp: new Date(publishedAt),
       mode,
     }
   }

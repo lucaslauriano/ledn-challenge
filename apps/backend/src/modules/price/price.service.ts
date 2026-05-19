@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config'
 import {
   AlertSeverity,
   AlertType,
+  CircuitState,
   DataConfidence,
   FeedMode,
   PriceRecord as SharedPriceRecord,
@@ -123,9 +124,17 @@ export class PriceService implements OnModuleInit {
     return result
   }
 
+  private resolvePriceSource(mode: FeedMode): PriceSource {
+    if (mode === FeedMode.DRIFTED) return PriceSource.REFERENCE
+    return PriceSource.LIVE
+  }
+
   private async handleTick(tick: PriceTick) {
     try {
       const receivedAt = Date.now()
+      const publishedAt = tick.timestamp.getTime()
+      const ageMs = Math.max(0, receivedAt - publishedAt)
+      const source = this.resolvePriceSource(tick.mode)
       const confidence =
         tick.mode === FeedMode.DRIFTED
           ? DataConfidence.ESTIMATED
@@ -133,13 +142,13 @@ export class PriceService implements OnModuleInit {
       const record = {
         assetId: tick.assetId,
         value: tick.price,
-        timestamp: tick.timestamp.getTime(),
-        publishedAt: tick.timestamp.getTime(),
+        timestamp: publishedAt,
+        publishedAt,
         receivedAt,
         confidence,
-        source: PriceSource.LIVE,
+        source,
         feedMode: tick.mode,
-        ageMs: 0,
+        ageMs,
         schemaVersion: APP_CONSTANTS.schemaVersion,
       }
 
@@ -168,8 +177,8 @@ export class PriceService implements OnModuleInit {
 
       this.logConfidenceChange(tick.assetId, confidence, {
         feedMode: tick.mode,
-        source: PriceSource.LIVE,
-        ageMs: 0,
+        source,
+        ageMs,
       })
       this.nats.publish(WsEventType.PRICE_UPDATED, record)
     } catch (err) {
@@ -233,12 +242,22 @@ export class PriceService implements OnModuleInit {
   }
 
   private async resolveHealthAlerts(assetId: string) {
+    const circuitState = await this.circuitBreaker.getState(assetId)
+
     await Promise.all([
       this.alertService.resolveByTypeAndResource(AlertType.DATA_STALE, assetId),
       this.alertService.resolveByTypeAndResource(
         AlertType.FEED_OFFLINE,
         assetId,
       ),
+      ...(circuitState === CircuitState.CLOSED
+        ? [
+            this.alertService.resolveAllByTypeAndResource(
+              AlertType.CIRCUIT_OPEN,
+              assetId,
+            ),
+          ]
+        : []),
     ])
   }
 

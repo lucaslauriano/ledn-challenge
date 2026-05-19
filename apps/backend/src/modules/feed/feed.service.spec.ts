@@ -8,6 +8,7 @@ const mockConfig = {
     const values: Record<string, number> = {
       FEED_INTERVAL_MS: 1000,
       FEED_DELAYED_EVERY_NTH_TICK: 3,
+      FEED_DELAYED_DELIVERY_LAG_MS: 3000,
       FEED_DRIFT_MULTIPLIER: 1.06,
     }
     return values[key] ?? defaultValue
@@ -55,6 +56,9 @@ describe('FeedService', () => {
   })
 
   it('emits delayed ticks only on the configured cadence', () => {
+    const now = Date.now()
+    jest.spyOn(Date, 'now').mockReturnValue(now)
+
     service.setMode('BTC', FeedMode.DELAYED)
 
     expect(generateTick(service, 'BTC')).toBeNull()
@@ -63,8 +67,11 @@ describe('FeedService', () => {
       expect.objectContaining({
         assetId: 'BTC',
         mode: FeedMode.DELAYED,
+        timestamp: new Date(now - 3000),
       }),
     )
+
+    jest.restoreAllMocks()
   })
 
   it('marks drifted ticks with DRIFTED mode', () => {

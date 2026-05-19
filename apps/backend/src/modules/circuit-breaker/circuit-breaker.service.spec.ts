@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing'
 import { ConfigService } from '@nestjs/config'
 import { CircuitBreakerService } from './circuit-breaker.service'
 import { RedisService } from '../../common/redis/redis.service'
-import { CircuitState, WsEventType } from '@ledn/shared'
+import { AlertType, CircuitState, WsEventType } from '@ledn/shared'
 import { NatsService } from '../../common/nats/nats.service'
 import { AlertService } from '../alert/alert.service'
 
@@ -31,7 +31,7 @@ const mockNats = {
 }
 
 const mockAlertService = {
-  resolveByTypeAndResource: jest.fn(),
+  resolveAllByTypeAndResource: jest.fn(),
 }
 
 describe('CircuitBreakerService', () => {
@@ -102,13 +102,34 @@ describe('CircuitBreakerService', () => {
       expect(state).toBe(CircuitState.CLOSED)
     })
 
-    it('should return OPEN when failures reach threshold', async () => {
+    it('should return OPEN when failures reach threshold from CLOSED', async () => {
+      mockRedis.get.mockResolvedValue(CircuitState.CLOSED)
       mockRedis.incr.mockResolvedValue(3)
       mockRedis.set.mockResolvedValue('OK')
 
       const state = await service.recordFailure('BTC')
 
       expect(state).toBe(CircuitState.OPEN)
+      expect(mockNats.publish).toHaveBeenCalledWith('alert.trigger', {
+        type: AlertType.CIRCUIT_OPEN,
+        severity: expect.any(String),
+        assetId: 'BTC',
+        message: expect.stringContaining('BTC'),
+      })
+    })
+
+    it('should not reopen or emit a new circuit alert from HALF_OPEN', async () => {
+      mockRedis.get.mockResolvedValue(CircuitState.HALF_OPEN)
+      mockRedis.incr.mockResolvedValue(3)
+      mockRedis.set.mockResolvedValue('OK')
+
+      const state = await service.recordFailure('BTC')
+
+      expect(state).toBe(CircuitState.CLOSED)
+      expect(mockNats.publish).not.toHaveBeenCalledWith(
+        'alert.trigger',
+        expect.anything(),
+      )
     })
   })
 
@@ -153,6 +174,10 @@ describe('CircuitBreakerService', () => {
       await service.reset('BTC')
 
       expect(mockRedis.del).toHaveBeenCalledTimes(3)
+      expect(mockAlertService.resolveAllByTypeAndResource).toHaveBeenCalledWith(
+        AlertType.CIRCUIT_OPEN,
+        'BTC',
+      )
     })
   })
 })

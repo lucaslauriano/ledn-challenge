@@ -5,6 +5,7 @@ import { LiquidityModule } from '../liquidity/liquidity.module'
 import { AlertModule } from '../alert/alert.module'
 import { FeedModule } from '../feed/feed.module'
 import { SettlementModule } from '../settlement/settlement.module'
+import { CircuitBreakerModule } from '../circuit-breaker/circuit-breaker.module'
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { SettlementModule } from '../settlement/settlement.module'
     AlertModule,
     FeedModule,
     SettlementModule,
+    CircuitBreakerModule,
   ],
   providers: [DashboardGateway],
   exports: [DashboardGateway],

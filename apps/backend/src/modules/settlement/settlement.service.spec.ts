@@ -16,6 +16,9 @@ const liquidityService = {
 
 const alertService = {
   resolveByTypeAndResource: jest.fn(),
+  resolveAllByTypeAndResource: jest.fn(),
+  findActiveByTypes: jest.fn().mockResolvedValue([]),
+  resolve: jest.fn(),
 }
 
 const nats = {

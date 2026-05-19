@@ -17,6 +17,7 @@ const mockNats = {
 
 const mockAlertService = {
   resolveByTypeAndResource: jest.fn(),
+  resolveAllByTypeAndResource: jest.fn(),
 }
 
 const makePriceRecord = (

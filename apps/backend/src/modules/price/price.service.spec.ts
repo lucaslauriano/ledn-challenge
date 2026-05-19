@@ -153,6 +153,67 @@ describe('PriceService', () => {
   })
 
   describe('price ticks', () => {
+    it('publishes delayed ticks with delivery lag metadata', async () => {
+      const publishedAt = Date.now() - 3000
+      mockRedis.set.mockResolvedValue('OK')
+      mockPriceModel.create.mockResolvedValue({})
+      mockCircuitBreaker.recordSuccess.mockResolvedValue(undefined)
+      mockAlertService.resolveByTypeAndResource.mockResolvedValue(undefined)
+
+      await (
+        service as unknown as {
+          handleTick: (tick: {
+            assetId: string
+            price: number
+            timestamp: Date
+            mode: FeedMode
+          }) => Promise<void>
+        }
+      ).handleTick({
+        assetId: 'BTC',
+        price: 65000,
+        timestamp: new Date(publishedAt),
+        mode: FeedMode.DELAYED,
+      })
+
+      const priceUpdate = mockNats.publish.mock.calls.find(
+        ([event]) => event === 'PRICE_UPDATED',
+      )?.[1] as { ageMs: number; source: PriceSource }
+
+      expect(priceUpdate.ageMs).toBeGreaterThanOrEqual(3000)
+      expect(priceUpdate.source).toBe(PriceSource.LIVE)
+    })
+
+    it('publishes drifted ticks as reference-sourced with zero delivery lag', async () => {
+      mockRedis.set.mockResolvedValue('OK')
+      mockPriceModel.create.mockResolvedValue({})
+      mockCircuitBreaker.recordSuccess.mockResolvedValue(undefined)
+      mockAlertService.resolveByTypeAndResource.mockResolvedValue(undefined)
+
+      await (
+        service as unknown as {
+          handleTick: (tick: {
+            assetId: string
+            price: number
+            timestamp: Date
+            mode: FeedMode
+          }) => Promise<void>
+        }
+      ).handleTick({
+        assetId: 'ETH',
+        price: 3500,
+        timestamp: new Date(),
+        mode: FeedMode.DRIFTED,
+      })
+
+      const priceUpdate = mockNats.publish.mock.calls.find(
+        ([event]) => event === 'PRICE_UPDATED',
+      )?.[1] as { ageMs: number; source: PriceSource }
+
+      expect(priceUpdate.ageMs).toBeLessThan(50)
+      expect(priceUpdate.source).toBe(PriceSource.REFERENCE)
+    })
+
     it('publishes PRICE_DRIFT alerts for drifted ticks', async () => {
       mockRedis.set.mockResolvedValue('OK')
       mockPriceModel.create.mockResolvedValue({})

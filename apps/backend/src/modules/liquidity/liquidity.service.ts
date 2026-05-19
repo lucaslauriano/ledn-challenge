@@ -315,6 +315,8 @@ export class LiquidityService implements OnModuleInit {
     // Keep available/locked stable so operator lock/release actions are obvious.
     this.applyWave('settlement-rail', 0.012)
 
+    this.touchSource('internal-ledger')
+
     if (this.tick % 4 === 0) {
       this.sources.custodian.status = LiquiditySourceState.DELAYED
     } else {
@@ -410,7 +412,7 @@ export class LiquidityService implements OnModuleInit {
         message: `Available liquidity dropped to ${(availableRatio * 100).toFixed(1)}%`,
       })
     } else {
-      await this.alertService.resolveByTypeAndResource(
+      await this.alertService.resolveAllByTypeAndResource(
         AlertType.LIQUIDITY_LOW,
         'liquidity',
       )
@@ -428,12 +430,14 @@ export class LiquidityService implements OnModuleInit {
         message: `${staleSource.sourceId} is ${staleSource.status.toLowerCase()}`,
       })
     } else {
-      for (const source of snapshot.sources) {
-        await this.alertService.resolveByTypeAndResource(
-          AlertType.LIQUIDITY_SOURCE_STALE,
-          source.sourceId,
-        )
-      }
+      await Promise.all(
+        snapshot.sources.map((source) =>
+          this.alertService.resolveAllByTypeAndResource(
+            AlertType.LIQUIDITY_SOURCE_STALE,
+            source.sourceId,
+          ),
+        ),
+      )
     }
   }
 }

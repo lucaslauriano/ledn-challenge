@@ -120,11 +120,33 @@ export class AlertService implements OnModuleInit {
     await this.resolve(alertId)
   }
 
+  async resolveAllByTypeAndResource(
+    type: AlertType,
+    resourceId: string,
+  ): Promise<void> {
+    const alerts = await this.alertModel.find({
+      type,
+      assetId: resourceId,
+      resolved: false,
+    })
+
+    await Promise.all(alerts.map((alert) => this.resolve(alert._id.toString())))
+  }
+
   async findActive(): Promise<AlertEvent[]> {
     const alerts = await this.alertModel
       .find({ resolved: false })
       .sort({ createdAt: -1 })
       .limit(50)
+
+    return alerts.map((alert) => this.toAlertEvent(alert))
+  }
+
+  async findActiveByTypes(types: AlertType[]): Promise<AlertEvent[]> {
+    const alerts = await this.alertModel
+      .find({ resolved: false, type: { $in: types } })
+      .sort({ createdAt: -1 })
+      .limit(100)
 
     return alerts.map((alert) => this.toAlertEvent(alert))
   }

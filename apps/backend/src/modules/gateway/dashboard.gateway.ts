@@ -9,12 +9,15 @@ import {
 import { Server, Socket } from 'socket.io'
 import { Logger, OnModuleInit } from '@nestjs/common'
 import {
+  CircuitState,
   FeedMode,
   FeedScenario,
   WS_EVENT_CHANNEL,
   WsEvent,
   WsEventType,
 } from '@ledn/shared'
+import { APP_CONSTANTS } from '../../config/constants'
+import { CircuitBreakerService } from '../circuit-breaker/circuit-breaker.service'
 import { PriceService } from '../price/price.service'
 import { LiquidityService } from '../liquidity/liquidity.service'
 import { AlertService } from '../alert/alert.service'
@@ -40,6 +43,7 @@ export class DashboardGateway
     private readonly alertService: AlertService,
     private readonly feedService: FeedService,
     private readonly settlementService: SettlementService,
+    private readonly circuitBreakerService: CircuitBreakerService,
     private readonly nats: NatsService,
   ) {}
 
@@ -116,17 +120,47 @@ export class DashboardGateway
   }
 
   private async sendInitialState(client: Socket) {
-    const [prices, liquidity, alerts, settlements] = await Promise.all([
-      this.priceService.getLatestPrices(),
-      Promise.resolve(this.liquidityService.getSnapshot()),
-      this.alertService.findActive(),
-      Promise.resolve(this.settlementService.getSnapshot()),
-    ])
+    const [prices, liquidity, alerts, settlements, circuitStates, feedModes] =
+      await Promise.all([
+        this.priceService.getLatestPrices(),
+        Promise.resolve(this.liquidityService.getSnapshot()),
+        this.alertService.findActive(),
+        Promise.resolve(this.settlementService.getSnapshot()),
+        this.getCircuitStates(),
+        Promise.resolve(this.getFeedModes()),
+      ])
 
     client.emit(WS_EVENT_CHANNEL, {
       type: WsEventType.INITIAL_STATE,
-      payload: { prices, liquidity, alerts, settlements },
+      payload: {
+        prices,
+        liquidity,
+        alerts,
+        settlements,
+        circuitStates,
+        feedModes,
+      },
     } satisfies WsEvent)
+  }
+
+  private async getCircuitStates(): Promise<Record<string, CircuitState>> {
+    const entries = await Promise.all(
+      APP_CONSTANTS.assets.map(async (assetId) => [
+        assetId,
+        await this.circuitBreakerService.getState(assetId),
+      ]),
+    )
+
+    return Object.fromEntries(entries) as Record<string, CircuitState>
+  }
+
+  private getFeedModes(): Record<string, FeedMode> {
+    return Object.fromEntries(
+      APP_CONSTANTS.assets.map((assetId) => [
+        assetId,
+        this.feedService.getMode(assetId),
+      ]),
+    )
   }
 
   private emitEvent(event: WsEvent) {

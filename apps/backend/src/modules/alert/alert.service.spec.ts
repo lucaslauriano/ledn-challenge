@@ -6,9 +6,13 @@ import { NatsService } from '../../common/nats/nats.service'
 import { AlertRecord } from './alert.schema'
 import { AlertService } from './alert.service'
 
-const makeAlert = (id: string, resolved = false) => ({
+const makeAlert = (
+  id: string,
+  resolved = false,
+  type: AlertType = AlertType.DATA_STALE,
+) => ({
   _id: { toString: () => id },
-  type: AlertType.DATA_STALE,
+  type,
   severity: AlertSeverity.MEDIUM,
   message: 'BTC price is stale',
   assetId: 'BTC',
@@ -19,10 +23,10 @@ const makeAlert = (id: string, resolved = false) => ({
 
 const mockAlertModel = {
   create: jest.fn(),
+  find: jest.fn(),
   findById: jest.fn(),
   findByIdAndDelete: jest.fn(),
   findByIdAndUpdate: jest.fn(),
-  find: jest.fn(),
 }
 
 const mockNats = {
@@ -102,6 +106,37 @@ describe('AlertService', () => {
     expect(mockNats.publish).toHaveBeenCalledWith(
       WsEventType.ALERT_CREATED,
       expect.objectContaining({ id: 'alert-2' }),
+    )
+  })
+
+  it('resolves all active alerts for a type and resource', async () => {
+    const alerts = [
+      makeAlert('alert-1', false, AlertType.CIRCUIT_OPEN),
+      makeAlert('alert-2', false, AlertType.CIRCUIT_OPEN),
+    ]
+
+    mockAlertModel.find.mockResolvedValue(alerts)
+    mockAlertModel.findByIdAndUpdate.mockImplementation((_id, update) =>
+      Promise.resolve({
+        ...alerts[0],
+        ...update,
+        assetId: 'BTC',
+        type: AlertType.CIRCUIT_OPEN,
+      }),
+    )
+    mockRedis.del.mockResolvedValue(1)
+
+    await service.resolveAllByTypeAndResource(AlertType.CIRCUIT_OPEN, 'BTC')
+
+    expect(mockAlertModel.find).toHaveBeenCalledWith({
+      type: AlertType.CIRCUIT_OPEN,
+      assetId: 'BTC',
+      resolved: false,
+    })
+    expect(mockAlertModel.findByIdAndUpdate).toHaveBeenCalledTimes(2)
+    expect(mockNats.publish).toHaveBeenCalledWith(
+      WsEventType.ALERT_RESOLVED,
+      expect.anything(),
     )
   })
 })

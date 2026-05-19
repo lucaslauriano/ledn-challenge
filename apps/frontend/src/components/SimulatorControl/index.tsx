@@ -27,17 +27,17 @@ const scenarios = [
   {
     scenario: FeedScenario.BTC_GOES_OFFLINE,
     label: 'BTC Offline Path',
-    durationMs: 20_000,
+    durationMs: 18_000,
   },
   {
     scenario: FeedScenario.ETH_DRIFTS,
     label: 'ETH Drift Path',
-    durationMs: 15_000,
+    durationMs: 18_000,
   },
   {
     scenario: FeedScenario.DUAL_PRESSURE,
     label: 'Dual Pressure',
-    durationMs: 20_000,
+    durationMs: 18_000,
   },
 ]
 

@@ -109,7 +109,7 @@ export class CircuitBreakerService implements OnModuleInit {
 
     if (
       failures >= this.failureThreshold &&
-      currentState !== CircuitState.OPEN
+      currentState === CircuitState.CLOSED
     ) {
       await this.setState(assetId, CircuitState.OPEN)
       this.logger.warn(
@@ -169,7 +169,7 @@ export class CircuitBreakerService implements OnModuleInit {
       state: CircuitState.CLOSED,
       timestamp: Date.now(),
     })
-    await this.alertService.resolveByTypeAndResource(
+    await this.alertService.resolveAllByTypeAndResource(
       AlertType.CIRCUIT_OPEN,
       assetId,
     )
