@@ -1,3 +1,4 @@
+import { join } from 'path'
 import { Module } from '@nestjs/common'
 import { ConfigModule, ConfigService } from '@nestjs/config'
 import { MongooseModule } from '@nestjs/mongoose'
@@ -17,7 +18,7 @@ import { SettlementModule } from './modules/settlement/settlement.module'
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env',
+      envFilePath: join(__dirname, '..', '.env'),
     }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],

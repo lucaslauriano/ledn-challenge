@@ -96,12 +96,16 @@ The backend uses NestJS, MongoDB, Redis, NATS, and Socket.IO. The frontend uses 
 
 ## Local Setup
 
+Run all commands from the repository root (`ledn-challenge/`). npm workspace scripts will not work from `apps/backend` or `apps/frontend`.
+
 ### Prerequisites
 
-- Node.js
+- Node.js 22.x (matches CI)
 - npm
 - Docker
-- A MongoDB connection string
+- Your own MongoDB connection string (for example MongoDB Atlas M0)
+
+MongoDB is **not** started by `docker compose`. NATS and Redis are.
 
 ### 1. Install dependencies
 
@@ -120,16 +124,30 @@ This starts:
 - NATS on `localhost:4222`
 - Redis on `localhost:6379`
 
-MongoDB is configured through `MONGODB_URI`.
+### 3. Configure environment
 
-### 3. Create environment files
+You need **your own** `MONGODB_URI`. Do not use placeholder credentials from `apps/backend/.env.example`.
 
-Copy `.env.example` to `.env` at the repository root, then fill `MONGODB_URI`. The NestJS backend reads this root `.env` file.
+**MongoDB Atlas (quick path):**
 
-For frontend builds, the same file documents the Vite variables. Export them in your shell or create `apps/frontend/.env.local` with:
+1. Create a free M0 cluster.
+2. Create a database user.
+3. Under Network Access, allow your IP (or `0.0.0.0/0` for a quick local demo).
+4. Connect → Drivers → copy the Node.js connection string.
+5. Set the database name in the path to `ledn-challenge` (for example `...mongodb.net/ledn-challenge?...`).
 
-- `VITE_WS_URL`
+Copy the backend example file and set your MongoDB URI:
+
+```bash
+cp apps/backend/.env.example apps/backend/.env
+```
+
+Edit `apps/backend/.env`. Other variables already point at the local Docker services (`NATS_URL`, `REDIS_HOST`, `REDIS_PORT`).
+
+**Frontend (optional for `npm run dev`):** defaults to `http://localhost:3000` via `apps/frontend/src/config/env.ts`. Override only if the API runs elsewhere — see `apps/frontend/.env.example`, or use `apps/frontend/.env` / `apps/frontend/.env.local`:
+
 - `VITE_API_URL`
+- `VITE_WS_URL`
 
 ### 4. Build shared contracts
 
@@ -139,16 +157,38 @@ npm run build --workspace @ledn/shared
 
 ### 5. Start backend
 
+In terminal 1:
+
 ```bash
-npm run start:dev --workspace apps/backend
+npm run backend:dev
+```
+
+Equivalent:
+
+```bash
+npm run dev:backend
 ```
 
 Backend runs on `http://localhost:3000` by default.
 
-### 6. Start frontend
+Verify:
 
 ```bash
-npm run dev --workspace apps/frontend
+curl http://localhost:3000/health/metrics
+```
+
+### 6. Start frontend
+
+In terminal 2:
+
+```bash
+npm run frontend:dev
+```
+
+Equivalent:
+
+```bash
+npm run dev:frontend
 ```
 
 Frontend runs on the Vite dev server, usually `http://localhost:5173`.

@@ -6,10 +6,12 @@
     "packages/*"
   ],
   "scripts": {
-    "dev:backend": "npm run dev --workspace=apps/backend",
-    "dev:frontend": "npm run dev --workspace=apps/frontend",
-    "test:backend": "npm run test --workspace=apps/backend",
-    "test:frontend": "npm run test --workspace=apps/frontend",
+    "backend:dev": "npm run start:dev --workspace=backend",
+    "frontend:dev": "npm run dev --workspace=frontend",
+    "dev:backend": "npm run backend:dev",
+    "dev:frontend": "npm run frontend:dev",
+    "test:backend": "npm run test --workspace=backend",
+    "test:frontend": "npm run test --workspace=frontend",
     "lint": "npm run lint --workspaces --if-present"
   },
   "devDependencies": {
