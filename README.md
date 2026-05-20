@@ -10,7 +10,7 @@ The core idea is simple: **price confidence is treated as operational data**. Wh
 
 ## Demo Video (Loom)
 
-**[Watch the walkthrough](https://drive.google.com/drive/folders/1NJwVpAUwGedjGfsSXC6cwi2fGj1Tso8q?usp=sharing)** — 3–5 min demo: problem framing, architecture, and how degraded feeds affect liquidity and settlements.
+**[Watch the walkthrough](https://share.descript.com/view/rAkY9XgVgom)** — 3–5 min demo: problem framing, architecture, and how degraded feeds affect liquidity and settlements.
 
 ## Tech Stack
 
