@@ -8,6 +8,24 @@ This is a full-stack operational dashboard for two primary financial operations 
 
 The core idea is simple: **price confidence is treated as operational data**. When a feed degrades, the UI does not only show an alert; liquidity automatically enters conservative mode and lock decisions use adjusted availability.
 
+## Demo Video (Loom)
+
+**[Watch the walkthrough](https://drive.google.com/drive/folders/1NJwVpAUwGedjGfsSXC6cwi2fGj1Tso8q?usp=sharing)** — 3–5 min demo: problem framing, architecture, and how degraded feeds affect liquidity and settlements.
+
+## Tech Stack
+
+- **NestJS** — REST API, modules, health, WebSocket gateway
+- **MongoDB** — price history and persisted alerts
+- **Redis** — last-price cache, circuit breaker state, alert deduplication
+- **NATS** — internal pub/sub between services (`PRICE_UPDATED`, liquidity, alerts, circuit)
+- **Socket.IO (WebSocket)** — real-time backend → browser (`{ type, payload }`)
+- **React + Vite** — SPA dashboard
+- **Zustand** — UI state (prices, liquidity, alerts, settlements)
+- **Chakra UI** — UI components
+- **@ledn/shared** — shared types/contracts for backend and frontend
+- **Docker** — local NATS and Redis
+- **Jest** — backend tests
+
 ## What Is Implemented
 
 - Mock BTC/ETH price feed with deterministic modes:
@@ -80,7 +98,7 @@ SettlementController
      -> LiquidityService reverses inFlight -> available
 ```
 
-The backend uses NestJS, MongoDB, Redis, NATS, and Socket.IO. The frontend uses React, Vite, Chakra UI, Socket.IO client, and Zustand. Shared contracts live in `packages/shared`.
+See [Tech Stack](#tech-stack) for a concise breakdown.
 
 ## Data Flow
 
@@ -227,7 +245,7 @@ Suggested walkthrough:
 6. Force delay or fail: delayed/failed settlement alerts appear and the dashboard shows the exposure window.
 7. Recover feed to Healthy: alerts resolve, circuit closes, liquidity exits conservative mode.
 
-See `docs/LOOM_SCRIPT.md` for a 3-5 minute recording script.
+See [Demo Video (Loom)](#demo-video-loom) and `docs/LOOM_SCRIPT.md` for the recording script.
 
 ## API Reference
 
